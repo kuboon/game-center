@@ -1,8 +1,10 @@
 # game-center
 
 ユーザが様々なミニゲームで獲得した実績を一元管理するサービス。
-ゲーム本体は第三者(主に LLM によるバイブコーディング)が開発し、GitHub Pages や Claude Artifacts で公開される。
-このリポジトリはハブサイト、通信プロトコル、開発者向けドキュメント(llms.txt / skill)、ゲーム自動登録用の GitHub Action を提供する。
+ゲーム本体は第三者(主に LLM によるバイブコーディング)が開発し、GitHub Pages や
+Claude Artifacts で公開される。
+このリポジトリはハブサイト、通信プロトコル、開発者向けドキュメント(llms.txt /
+skill)、ゲーム自動登録用の GitHub Action を提供する。
 
 設計の全体像は [docs/grand_design.md](docs/grand_design.md) を参照。
 
