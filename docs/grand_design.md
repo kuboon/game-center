@@ -15,7 +15,7 @@ status: draft (2026-08-16)
 - **開発者向け提供物**：プロトコル文書、LLM 用テキスト(llms.txt)、Claude 用 skill、貼り付け用 SDK
 - **GitHub Action**：ゲームリポジトリから game-center へゲームを自動登録する仕組み
 
-以下、ハブサイトのドメインは `games.kbn.one` (仮)と表記する。
+ハブサイトのドメインは `ga-cen.kbn.one` とする。
 
 ## 設計を規定する2つの制約
 
@@ -38,7 +38,7 @@ Artifact 上のページは外部ホストへの fetch/XHR が遮断されるた
   │ llms.txt / skill を読んで実装        │ サインイン(id.kbn.one)
   │ gamecenter.json を書く               │ カタログからゲームを起動
   ▼                                      ▼
-ゲームリポジトリ ──GitHub Action──▶ game-center ハブ (games.kbn.one)
+ゲームリポジトリ ──GitHub Action──▶ game-center ハブ (ga-cen.kbn.one)
   │  (登録 API を呼ぶ)                   │ Deno + Remix v3
   ▼                                      │ Turso (libsql)
 GitHub Pages / Claude Artifacts ◀───────┘
@@ -58,9 +58,9 @@ GitHub Pages / Claude Artifacts ◀───────┘
 | ランタイム | Deno (workspace 構成) | package.json は置かない |
 | Web フレームワーク | Remix v3 (`@remix-run/fetch-router` + `@remix-run/ui`) | [deno-remix-reference](https://github.com/kuboon/deno-remix-reference) の構成に従う |
 | スタイル | Tailwind CSS v4 + daisyUI v5 | bundler パッケージでビルド |
-| DB | Turso (`npm:@libsql/client`) | HTTP 経由なのでホスティングを選ばない |
-| 認証 | id.kbn.one 連携 + `@remix-run/session` の Cookie セッション | 連携方式は要確認(後述) |
-| ホスティング | Deno Deploy (推奨) | Deno ネイティブで Turso と相性がよい。Cloudflare Workers は代替案 |
+| DB | Turso (`npm:@libsql/client/web` + `@kuboon/remix-data-table-sqlite-turso`) | セッション等の揮発データも Turso に置く。Deno KV は使わない |
+| 認証 | id.kbn.one 連携 (DPoP、パスキー) | deno-remix-reference の実装を踏襲(後述) |
+| ホスティング | Deno Deploy | `@libsql/client/web` は fetch ベースでネイティブアドオン不要のため edge で動く |
 | SDK 配布 | JSR (`@kuboon` スコープ) + コピペ用単一ファイル | Artifacts は外部スクリプトを読み込めないため、コピペ配布が主 |
 | CI | GitHub Actions (`actions/checkout@v7`, `denoland/setup-deno@v2`) | `deno task check` と `deno task test` |
 
@@ -82,7 +82,7 @@ SDK は利用可能なモードを自動選択する。
 ゲームは次の URL を新規タブで開くだけでよい。
 
 ```
-https://games.kbn.one/claim/{game_id}/{achievement_key}
+https://ga-cen.kbn.one/claim/{game_id}/{achievement_key}
 ```
 
 遷移先でプレイヤーは(未サインインなら)サインインし、「実績を解除する」を確認して解除が記録される。
@@ -119,7 +119,7 @@ SDK はフラグメントからトークンを読み取って保存し、URL か
 
 ```jsonc
 {
-  "$schema": "https://games.kbn.one/schema/gamecenter.json",
+  "$schema": "https://ga-cen.kbn.one/schema/gamecenter.json",
   "id": "my-puzzle",              // 全体で一意な slug。初回登録時に所有者が確定する
   "title": "My Puzzle",
   "description": "3分で遊べるパズル",
@@ -143,11 +143,24 @@ SDK はフラグメントからトークンを読み取って保存し、URL か
 ## 認証とアカウント
 
 プレイヤーは game-center から id.kbn.one でサインアップとサインインを行う。
-game-center は id.kbn.one の発行するユーザ識別子を `users.external_id` に保存し、自前のセッション(`@remix-run/session` の Cookie)を張る。
+id.kbn.one は OIDC ではなく、**DPoP** (RFC 9449)によるパスキー認証 + Cookie レスのセッション共有を提供する。
+実装は [deno-remix-reference](https://github.com/kuboon/deno-remix-reference) にあるものを踏襲する。
 
-id.kbn.one との連携方式(OIDC か、独自のトークン + JWKS か、パスキー連携か)は現時点で未確認である。
-公開されている discovery エンドポイントは見つからなかったため、実装前に仕様を確認する(未決事項に記載)。
-連携部分は `server/auth/` に隔離し、方式が確定しても他へ影響しないようにする。
+サインインの流れは次のとおり。
+
+1. ブラウザが DPoP 鍵ペアを生成し(`@kuboon/dpop` の `init()`、IndexedDB に保存)、JWK thumbprint (RFC 7638)を計算する
+2. `https://id.kbn.one/authorize?dpop_jkt={thumbprint}&redirect_uri={戻り先}` へ遷移し、IdP でパスキー認証する
+3. IdP がその thumbprint に userId をバインドし、ブラウザを戻り先へリダイレクトする
+4. 以後、ブラウザは DPoP 証明付き fetch で `GET https://id.kbn.one/session` から `{ userId }` を得る(サインアウトは `POST /session/logout`)
+
+game-center サーバ側は、reference の `remix-dpop-session-middleware` パターンで受ける。
+ブラウザからの認証付きリクエストは DPoP 証明を伴い、ミドルウェアが証明を検証して thumbprint をセッション ID とするサーバセッションを開く。
+セッションストレージは reference の Deno KV 実装を Turso 実装(`packages/session_storage_turso`)に差し替える。
+
+SSR ページ(document GET)には DPoP 証明を付けられないため、ページはサインイン状態に依存しない形でレンダリングし、ナビバーや実績表示などの認証依存部分は clientEntry の hydration でクライアント側から埋める(reference の NavAuth / SignInCard と同じ構成)。
+
+server-to-server 連携(thumbprint に対応する userId のサーバ側検証や、IdP 経由のプッシュ通知)には、reference の相互 JWKS パターンを使う。
+game-center は `/.well-known/jwks.json` で自身の ES256 署名鍵を公開し、IdP への要求には `private_key_jwt` の client assertion を付ける。
 
 ゲーム開発者の認証は2系統ある。
 
@@ -204,6 +217,12 @@ create table api_tokens (
   name          text not null,
   created_at    text not null default (datetime('now')),
   last_used_at  text
+);
+
+create table dpop_sessions (
+  thumbprint    text primary key,          -- DPoP 鍵の JWK thumbprint
+  data          text not null,             -- セッションデータ (JSON)
+  expires_at    text not null
 );
 ```
 
@@ -298,7 +317,7 @@ server/                      # Remix v3 アプリ (ハブ + API)
   routes.ts                  # ルート宣言
   router.ts                  # ルータ組み立て (export default)
   controllers/               # ページ・API のコントローラ
-  auth/                      # id.kbn.one 連携(方式確定まで隔離)
+  middleware/                # DPoP セッションミドルウェア(id.kbn.one 連携)
   db/
     client.ts                # Turso クライアント
     migrations/              # 連番 SQL
@@ -308,6 +327,7 @@ bundler/                     # Deno.bundle + Tailwind ビルド → bundled/
 packages/
   protocol/                  # gamecenter.json の JSON Schema と共有型、検証関数
   sdk/                       # @kuboon/game-center-sdk (単一ファイル、JSR 公開)
+  session_storage_turso/     # Turso を背にした SessionStorage 実装(KV 代替)
 action/                      # ゲーム登録用 composite action (action.yml)
 skills/
   game-center/SKILL.md       # ゲーム開発者(LLM)向け Claude skill
@@ -324,22 +344,21 @@ skills/
 
 1. **M0 足場**：workspace 雛形、CI、SessionStart hook、Hello World が `deno task dev` で立つ
 2. **M1 データ層**：Turso 接続、マイグレーション、スキーマ一式
-3. **M2 認証**：id.kbn.one 連携(方式確認後)、セッション、`/me` の骨格
+3. **M2 認証**：id.kbn.one との DPoP 連携(reference 踏襲)、Turso セッションストレージ、`/me` の骨格
 4. **M3 ゲーム登録**：packages/protocol のスキーマ、`POST /api/v1/games`、開発者ダッシュボード、API トークン
 5. **M4 実績解除**：claim URL モードと REST モード、起動トークン、カタログとゲーム詳細ページ
 6. **M5 SDK と埋め込み**：SDK 単一ファイル、`/play/{id}` の postMessage モード、JSR 公開
 7. **M6 自動登録と LLM 提供物**：GitHub Action、protocol.md、llms.txt 生成、Claude skill
 8. **M7 磨き込み**：プロフィール公開ページ、ポイント集計、OGP、レートリミット
 
-M2 だけは外部(id.kbn.one の仕様確認)に依存するため、確認が遅れる場合は M3 以降を先行し、認証をダミー実装で差し替えておく。
+M2 の実装手本は deno-remix-reference にあるため外部依存は小さいが、thumbprint に対応する userId をサーバ側で検証する経路(未決事項)だけは IdP 側の仕様確認を要する。
+確認が遅れる場合は M3 以降を先行し、該当部分をダミー実装で差し替えておく。
 
 ## 未決事項
 
 実装前に確認・決定が要るものを挙げる。
 
-- **id.kbn.one の連携方式**:OIDC discovery が見つからなかったため、プロトコル(OIDC / 独自 JWT / パスキー)、エンドポイント、クライアント登録手順の確認が要る
-- **ドメイン**:`games.kbn.one` は仮。決定後に llms.txt、スキーマ URL、SDK 既定値へ反映する
-- **ホスティング**:Deno Deploy を推奨としたが、Cloudflare Workers 運用に寄せるなら bundler 構成の調整が要る
+- **thumbprint→userId のサーバ側検証**:reference ではブラウザが IdP の `/session` を直接呼ぶ構成であり、RP サーバが thumbprint に対応する userId を検証付きで得る経路(IdP の RP 向け API の有無と仕様)の確認が要る
 - **game id の予約と移譲**:slug の初回取得を先着とするか、審査を挟むか
 - **Artifacts の iframe 可否**:claude.ai 側の X-Frame-Options / CSP を実測し、postMessage モードの対象外と確定させる
 - **実績の改竄耐性**:自己申告モデルで開始する方針の最終確認(ランキング等を将来入れる場合は別途設計)
