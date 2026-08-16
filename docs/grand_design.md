@@ -151,16 +151,22 @@ id.kbn.one は OIDC ではなく、**DPoP** (RFC 9449)によるパスキー認�
 1. ブラウザが DPoP 鍵ペアを生成し(`@kuboon/dpop` の `init()`、IndexedDB に保存)、JWK thumbprint (RFC 7638)を計算する
 2. `https://id.kbn.one/authorize?dpop_jkt={thumbprint}&redirect_uri={戻り先}` へ遷移し、IdP でパスキー認証する
 3. IdP がその thumbprint に userId をバインドし、ブラウザを戻り先へリダイレクトする
-4. 以後、ブラウザは DPoP 証明付き fetch で `GET https://id.kbn.one/session` から `{ userId }` を得る(サインアウトは `POST /session/logout`)
+4. 以後、ブラウザは DPoP 証明付き fetch で `GET https://id.kbn.one/session` から `{ userId, jws, nickname }` を得る(サインアウトは `POST /session/logout`)
 
 game-center サーバ側は、reference の `remix-dpop-session-middleware` パターンで受ける。
 ブラウザからの認証付きリクエストは DPoP 証明を伴い、ミドルウェアが証明を検証して thumbprint をセッション ID とするサーバセッションを開く。
 セッションストレージは reference の Deno KV 実装を Turso 実装(`packages/session_storage_turso`)に差し替える。
 
+game-center サーバが userId を信頼する根拠は、`/session` 応答の **jws** である。
+これは IdP が ES256 署名した JWT で、`sub`(userId)、`iss`、`nbf` / `exp`(1時間)、`jti` に加え、`cnf.jkt` にブラウザの DPoP 鍵 thumbprint が入る(RFC 9449 の鍵バインド)。
+ブラウザは jws を DPoP 証明付きでサーバへ送り、サーバは IdP の JWKS(`https://id.kbn.one/.well-known/jwks.json`)で署名と `iss` / `exp` / `nbf` を検証し、`cnf.jkt` がその DPoP セッションの thumbprint と一致することを確認してから、userId をセッションに書き込み `users` 行を upsert する。
+`nickname` クレームは `display_name` の初期値に使う。
+
 SSR ページ(document GET)には DPoP 証明を付けられないため、ページはサインイン状態に依存しない形でレンダリングし、ナビバーや実績表示などの認証依存部分は clientEntry の hydration でクライアント側から埋める(reference の NavAuth / SignInCard と同じ構成)。
 
-server-to-server 連携(thumbprint に対応する userId のサーバ側検証や、IdP 経由のプッシュ通知)には、reference の相互 JWKS パターンを使う。
+server-to-server 連携(IdP 経由のプッシュ通知 `POST /rp/notifications`。実績解除の通知に使える)には、相互 JWKS パターンを使う。
 game-center は `/.well-known/jwks.json` で自身の ES256 署名鍵を公開し、IdP への要求には `private_key_jwt` の client assertion を付ける。
+clientId は RP の origin そのもので、IdP 側での事前登録は不要である(`AUTHORIZE_WHITELIST` のホストとそのサブドメインが許可される)。
 
 ゲーム開発者の認証は2系統ある。
 
@@ -351,14 +357,13 @@ skills/
 7. **M6 自動登録と LLM 提供物**：GitHub Action、protocol.md、llms.txt 生成、Claude skill
 8. **M7 磨き込み**：プロフィール公開ページ、ポイント集計、OGP、レートリミット
 
-M2 の実装手本は deno-remix-reference にあるため外部依存は小さいが、thumbprint に対応する userId をサーバ側で検証する経路(未決事項)だけは IdP 側の仕様確認を要する。
-確認が遅れる場合は M3 以降を先行し、該当部分をダミー実装で差し替えておく。
+M2 の実装手本は deno-remix-reference(RP 側)と id.kbn.one 本体(IdP 側)の両方が手元にあるため、外部依存はない。
 
 ## 未決事項
 
 実装前に確認・決定が要るものを挙げる。
 
-- **thumbprint→userId のサーバ側検証**:reference ではブラウザが IdP の `/session` を直接呼ぶ構成であり、RP サーバが thumbprint に対応する userId を検証付きで得る経路(IdP の RP 向け API の有無と仕様)の確認が要る
+- **AUTHORIZE_WHITELIST**:本番の id.kbn.one の許可リストに `ga-cen.kbn.one` が含まれること(`kbn.one` が登録済みならサブドメインとして許可される)の確認
 - **game id の予約と移譲**:slug の初回取得を先着とするか、審査を挟むか
 - **Artifacts の iframe 可否**:claude.ai 側の X-Frame-Options / CSP を実測し、postMessage モードの対象外と確定させる
 - **実績の改竄耐性**:自己申告モデルで開始する方針の最終確認(ランキング等を将来入れる場合は別途設計)
