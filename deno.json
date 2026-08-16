@@ -1,0 +1,37 @@
+{
+  "workspace": [
+    "./server",
+    "./client",
+    "./bundler"
+  ],
+  "tasks": {
+    "dev": "deno task --cwd server dev",
+    "serve": "deno task --cwd server serve",
+    "bundle": "deno task --cwd bundler build",
+    "test": "deno test -P",
+    "check": "deno check && deno lint && deno fmt --check"
+  },
+  "permissions": {
+    "default": {}
+  },
+  "test": {
+    "permissions": "default"
+  },
+  "fmt": {
+    "exclude": ["docs/"]
+  },
+  "nodeModulesDir": "auto",
+  "minimumDependencyAge": {
+    "age": "P1D",
+    "exclude": ["jsr:@kuboon/*"]
+  },
+  "unstable": ["bundle"],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@remix-run/ui"
+  },
+  "imports": {
+    "daisyui": "npm:daisyui@^5.5.19",
+    "tailwindcss": "npm:tailwindcss@^4.1.18"
+  }
+}
