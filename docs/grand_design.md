@@ -86,15 +86,20 @@ https://ga-cen.kbn.one/claim/{game_id}/{achievement_key}
 ```
 
 遷移先でプレイヤーは(未サインインなら)サインインし、「実績を解除する」を確認して解除が記録される。
+スコアを付けたい場合はクエリ `?score=1200` を足す。
 トークンも fetch も不要なので、Artifacts のような制約環境でも、SDK を使わない手書きゲームでも動く。
 
 **REST モード** は、後述の起動トークンを Bearer に付けて `POST /api/v1/unlock` を呼ぶ。
 API は CORS をすべてのオリジンに開放する(トークン認証であり、Cookie を使わないため開放してよい)。
 
 **postMessage モード** は、game-center のプレイページ(`/play/{game_id}`)がゲームを iframe で埋め込んだ場合に使う。
-SDK は `window.parent !== window` を検出し、`{ type: "gc:unlock", achievement: key }` を親に postMessage する。
+SDK は `window.parent !== window` を検出し、`{ type: "gc:unlock", achievement: key, score? }` を親に postMessage する。
 親側は iframe の origin が登録済みゲームの URL と一致することを検証してから解除を記録する。
 Claude Artifacts は claude.ai 側の制約で iframe 埋め込みできない見込みのため、このモードは GitHub Pages 等のゲーム向けである。
+
+どのモードでも、解除には任意で **score**(整数)を添えられる。
+解除は冪等であり、解除済みの実績への再報告は、score が保存済みの値より高い場合だけ更新する(ハイスコアのみ保持。`unlocked_at` は初回のまま)。
+score のない再報告は何もしない。
 
 ### 起動フローと起動トークン
 
@@ -213,6 +218,7 @@ create table user_achievements (
   achievement_id integer not null references achievements(id),
   unlocked_at    text not null default (datetime('now')),
   via            text not null,           -- claim | rest | postmessage
+  score          integer,                 -- 任意。ゲームが報告するスコア
   primary key (user_id, achievement_id)
 );
 
@@ -243,7 +249,7 @@ create table dpop_sessions (
 | `POST /api/v1/games` | API トークン | gamecenter.json を upsert(初回は所有権確定) |
 | `GET /api/v1/games` | 不要 | 公開ゲーム一覧 |
 | `GET /api/v1/games/{id}` | 不要 | ゲーム詳細と実績定義 |
-| `POST /api/v1/unlock` | 起動トークン | 実績解除 `{ achievement: key }`。`aud` の game_id に閉じる |
+| `POST /api/v1/unlock` | 起動トークン | 実績解除 `{ achievement: key, score? }`。`aud` の game_id に閉じる |
 | `GET /api/v1/me` | 起動トークン | プレイヤーの表示名と、そのゲームでの解除済み実績 |
 
 Web UI 側の主なルートは次のとおり。
@@ -270,7 +276,8 @@ GitHub Pages のゲームは JSR / esm.sh から import してもよい。
 import { GameCenter } from "@kuboon/game-center-sdk"; // またはファイル同梱
 
 const gc = GameCenter.init({ gameId: "my-puzzle" });
-gc.unlock("first_clear");   // モードを自動選択して解除
+gc.unlock("first_clear");                  // モードを自動選択して解除
+gc.unlock("high_score", { score: 1200 });  // スコア付き。ハイスコアのみ保持
 gc.player;                  // { name } | null (起動トークンがある場合のみ)
 ```
 
