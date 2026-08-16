@@ -89,8 +89,8 @@ https://ga-cen.kbn.one/claim/{game_id}/{achievement_key}
 スコアを付けたい場合はクエリ `?score=1200` を足す。
 トークンも fetch も不要なので、Artifacts のような制約環境でも、SDK を使わない手書きゲームでも動く。
 
-**REST モード** は、後述の起動トークンを Bearer に付けて `POST /api/v1/unlock` を呼ぶ。
-API は CORS をすべてのオリジンに開放する(トークン認証であり、Cookie を使わないため開放してよい)。
+**REST モード** は、後述の起動トークンを Bearer に付けて `POST /api/game/v1/unlock` を呼ぶ。
+ゲーム用 API は CORS をすべてのオリジンに開放する(トークン認証であり、Cookie を使わないため開放してよい)。
 
 **postMessage モード** は、game-center のプレイページ(`/play/{game_id}`)がゲームを iframe で埋め込んだ場合に使う。
 SDK は `window.parent !== window` を検出し、`{ type: "gc:unlock", achievement: key, score? }` を親に postMessage する。
@@ -164,7 +164,7 @@ game-center サーバ側は、reference の `remix-dpop-session-middleware` パ�
 
 game-center サーバが userId を信頼する根拠は、`/session` 応答の **jws** である。
 これは IdP が ES256 署名した JWT で、`sub`(userId)、`iss`、`nbf` / `exp`(1時間)、`jti` に加え、`cnf.jkt` にブラウザの DPoP 鍵 thumbprint が入る(RFC 9449 の鍵バインド)。
-ブラウザは jws を DPoP 証明付きでサーバへ送り、サーバは IdP の JWKS(`https://id.kbn.one/.well-known/jwks.json`)で署名と `iss` / `exp` / `nbf` を検証し、`cnf.jkt` がその DPoP セッションの thumbprint と一致することを確認してから、userId をセッションに書き込み `users` 行を upsert する。
+ブラウザは jws を DPoP 証明付きで `POST /api/internal/session` に送り、サーバは IdP の JWKS(`https://id.kbn.one/.well-known/jwks.json`)で署名と `iss` / `exp` / `nbf` を検証し、`cnf.jkt` がその DPoP セッションの thumbprint と一致することを確認してから、userId をセッションに書き込み `users` 行を upsert する。
 `nickname` クレームは `display_name` の初期値に使う。
 
 SSR ページ(document GET)には DPoP 証明を付けられないため、ページはサインイン状態に依存しない形でレンダリングし、ナビバーや実績表示などの認証依存部分は clientEntry の hydration でクライアント側から埋める(reference の NavAuth / SignInCard と同じ構成)。
@@ -242,15 +242,41 @@ create table dpop_sessions (
 
 ## API 一覧
 
-すべて `/api/v1` 配下。認証方式は3種で、表の「認証」列に示す。
+API は呼び出し元ごとにパスを分け、CORS と認証をパス単位で固定する。
 
-| メソッドとパス | 認証 | 役割 |
-|---|---|---|
-| `POST /api/v1/games` | API トークン | gamecenter.json を upsert(初回は所有権確定) |
-| `GET /api/v1/games` | 不要 | 公開ゲーム一覧 |
-| `GET /api/v1/games/{id}` | 不要 | ゲーム詳細と実績定義 |
-| `POST /api/v1/unlock` | 起動トークン | 実績解除 `{ achievement: key, score? }`。`aud` の game_id に閉じる |
-| `GET /api/v1/me` | 起動トークン | プレイヤーの表示名と、そのゲームでの解除済み実績 |
+| 面 | パス | 呼び出し元 | 認証 | CORS |
+|---|---|---|---|---|
+| ゲーム用 | `/api/game/v1/*` | 各ゲームのページ(任意オリジン) | 起動トークン | すべてのオリジンに開放 |
+| 内部用 | `/api/internal/*` | ハブ自身のフロントエンド | DPoP | CORS ヘッダなし(同一オリジンのみ) |
+| 登録用 | `/api/registry/v1/*` | GitHub Action 等のサーバ・CI | API トークン | 不要(ブラウザから呼ばない) |
+
+**ゲーム用 API** は、起動トークンの `aud` に入っている game_id の範囲に閉じる。
+どのエンドポイントも他のゲームの情報には読み書きできず、プレイヤーについても「そのゲームでの実績」しか見えない。
+
+| メソッドとパス | 役割 |
+|---|---|
+| `POST /api/game/v1/unlock` | 実績解除 `{ achievement: key, score? }` |
+| `GET /api/game/v1/me` | プレイヤーの表示名と、そのゲームでの解除済み実績 |
+| `GET /api/game/v1/achievements` | そのゲームの実績定義(ゲーム内の進捗表示用) |
+
+**内部用 API** は、ハブの clientEntry(ナビバー、claim ページ、ダッシュボード)が DPoP 証明付き fetch で呼ぶ。
+CORS ヘッダを返さないため、他オリジンのページからは呼べない。
+
+| メソッドとパス | 役割 |
+|---|---|
+| `POST /api/internal/session` | IdP の jws を検証して userId をセッションに確定 |
+| `GET /api/internal/me/achievements` | 全ゲーム横断の自分の実績一覧 |
+| `POST /api/internal/claim` | claim ページの確認ボタンから実績解除 |
+| `GET`/`POST`/`PATCH` `/api/internal/games` | 自分のゲームの登録・編集(Web UI 用) |
+| `POST /api/internal/tokens` | 登録用 API トークンの発行・失効 |
+
+**登録用 API** はブラウザ外(CI やサーバ)から呼ぶ前提で、CORS は設定しない。
+
+| メソッドとパス | 役割 |
+|---|---|
+| `POST /api/registry/v1/games` | gamecenter.json を upsert(初回は所有権確定) |
+
+公開ゲーム一覧とゲーム詳細はハブのページ(SSR)として提供し、匿名向けの公開 JSON API は当面設けない。
 
 Web UI 側の主なルートは次のとおり。
 
@@ -303,7 +329,7 @@ jobs:
           # manifest: gamecenter.json  (省略時デフォルト)
 ```
 
-Action の実体は `action/` に置く composite action で、マニフェストをスキーマ検証してから `POST /api/v1/games` を呼ぶ。
+Action の実体は `action/` に置く composite action で、マニフェストをスキーマ検証してから `POST /api/registry/v1/games` を呼ぶ。
 検証エラーはその場で CI を落とし、LLM が自力で直せるメッセージを返す。
 
 ## LLM 向け提供物
@@ -358,7 +384,7 @@ skills/
 1. **M0 足場**：workspace 雛形、CI、SessionStart hook、Hello World が `deno task dev` で立つ
 2. **M1 データ層**：Turso 接続、マイグレーション、スキーマ一式
 3. **M2 認証**：id.kbn.one との DPoP 連携(reference 踏襲)、Turso セッションストレージ、`/me` の骨格
-4. **M3 ゲーム登録**：packages/protocol のスキーマ、`POST /api/v1/games`、開発者ダッシュボード、API トークン
+4. **M3 ゲーム登録**：packages/protocol のスキーマ、`POST /api/registry/v1/games`、開発者ダッシュボード、API トークン
 5. **M4 実績解除**：claim URL モードと REST モード、起動トークン、カタログとゲーム詳細ページ
 6. **M5 SDK と埋め込み**：SDK 単一ファイル、`/play/{id}` の postMessage モード、JSR 公開
 7. **M6 自動登録と LLM 提供物**：GitHub Action、protocol.md、llms.txt 生成、Claude skill
