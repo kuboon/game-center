@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "test": "deno test -A ./"
+  },
+  "compilerOptions": {
+    "lib": ["deno.ns", "dom"]
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@^1.0.19",
+    "@libsql/client": "npm:@libsql/client@^0.17.4"
+  }
+}
