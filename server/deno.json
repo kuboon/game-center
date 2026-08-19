@@ -14,7 +14,8 @@
     "@remix-run/ui": "npm:@remix-run/ui@^0.5.0",
     "@remix-run/fetch-router": "npm:@remix-run/fetch-router@0.21.0",
     "@remix-run/response": "npm:@remix-run/response@0.3.8",
-    "@remix-run/static-middleware": "npm:@remix-run/static-middleware@0.4.13"
+    "@remix-run/static-middleware": "npm:@remix-run/static-middleware@0.4.13",
+    "@libsql/client": "npm:@libsql/client@^0.17.4"
   },
   "permissions": {
     "default": {
@@ -25,7 +26,7 @@
         "TURSO_DATABASE_URL",
         "TURSO_AUTH_TOKEN"
       ],
-      "net": ["id.kbn.one", "localhost", "127.0.0.1"],
+      "net": ["id.kbn.one", "*.turso.io", "localhost", "127.0.0.1"],
       "read": ["../bundled"]
     }
   }

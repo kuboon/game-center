@@ -2,13 +2,16 @@
   "workspace": [
     "./server",
     "./client",
-    "./bundler"
+    "./bundler",
+    "./tests"
   ],
   "tasks": {
     "dev": "deno task --cwd server dev",
     "serve": "deno task --cwd server serve",
     "bundle": "deno task --cwd bundler build",
-    "test": "deno test -P",
+    "db": "deno run -A jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0/cli",
+    "migrate": "deno task db migrate",
+    "test": "deno test -P --ignore=tests && deno task --cwd tests test",
     "check": "deno check && deno lint && deno fmt --check"
   },
   "permissions": {
