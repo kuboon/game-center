@@ -11,11 +11,16 @@ Deno workspace。
 - `server/` — Remix v3 fetch-router のハブサーバ。`routes.ts`
   にルート定義、`controllers/` に各ページと API、`ui/document.tsx`
   がシェル、`utils/render.tsx` が shell/frame の描画分岐、`config.ts`
-  が環境変数、`db/client.ts` が Turso 接続
+  が環境変数、`db/` が Turso 接続とクエリ、`lib/idp_token.ts` が IdP
+  トークン検証、`middleware/dpop.ts` が DPoP セッション
 - `db/migrations/` — マイグレーション。`YYYYMMDDHHmmss_name/up.sql` と
   `down.sql`
 - `client/` — ブラウザエントリ。`@remix-run/ui` の `run()` が clientEntry を
-  hydrate し、`<Frame name="content">` のナビゲーションを担う
+  hydrate し、`<Frame name="content">` のナビゲーションを担う。`session.ts` が
+  DPoP セッションの共有ストア
+- `packages/` — ワークスペース内のライブラリ。`session_storage_kv`(KvRepo →
+  SessionStorage)と `dpop_session_middleware`(DPoP セッション)。どちらも
+  未公開のため id.kbn.one / deno-remix-reference から vendoring している
 - `bundler/` — `Deno.bundle` による JS ビルドと Tailwind CSS ビルド。出力は
   `bundled/`(git 管理外)
 - `assets/style.css` — Tailwind v4 + daisyUI の入力 CSS
@@ -56,6 +61,21 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   で適用する。起動時には適用しない(Deno Deploy では isolate ごとに競合するため)
 - libSQL は外部キーを既定で有効にする。参照先を作り直すマイグレーションでは
   自分で無効化する必要がある
+
+## 認証
+
+プレイヤーは id.kbn.one でサインインする。 OIDC ではなく DPoP (RFC 9449)
+で、Cookie を使わない。
+
+- ブラウザが DPoP 鍵を持ち、`/authorize?dpop_jkt=…&redirect_uri=…`
+  でパスキー認証する。以後 `GET {IdP}/session` が `{ userId, jws }` を返す
+- `jws` は IdP が署名した JWT で、`cnf.jkt` にブラウザの鍵 thumbprint
+  が入る。サーバはこれを IdP の JWKS で検証し、`cnf.jkt` がリクエストの DPoP
+  鍵と一致することを確認して初めて userId を信じる(`server/lib/idp_token.ts`)
+- セッションは thumbprint をキーに `kv` テーブルへ入る。DB
+  未設定ならミドルウェアごと外れ、サインアウト状態で動く
+- SSR には DPoP 証明を付けられないため、サインイン依存の UI は clientEntry
+  にしてブラウザ側で埋める(`NavAuth` / `AccountCard`)
 
 ## 規約
 

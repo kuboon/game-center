@@ -5,7 +5,10 @@
     "serve": "deno serve -P ./router.ts"
   },
   "compilerOptions": {
-    "lib": ["deno.ns", "dom"],
+    "lib": [
+      "deno.ns",
+      "dom"
+    ],
     "jsx": "react-jsx",
     "jsxImportSource": "@remix-run/ui"
   },
@@ -15,7 +18,13 @@
     "@remix-run/fetch-router": "npm:@remix-run/fetch-router@0.21.0",
     "@remix-run/response": "npm:@remix-run/response@0.3.8",
     "@remix-run/static-middleware": "npm:@remix-run/static-middleware@0.4.13",
-    "@libsql/client": "npm:@libsql/client@^0.17.4"
+    "@libsql/client": "npm:@libsql/client@^0.17.4",
+    "jose": "jsr:@panva/jose@^6.2.3",
+    "@kuboon/kv": "jsr:@kuboon/kv@^0.2.0",
+    "@kuboon/dpop": "jsr:@kuboon/dpop@^0.2.0",
+    "@remix-run/session": "npm:@remix-run/session@^0.4.2",
+    "@game-center/session-storage-kv": "jsr:@game-center/session-storage-kv@^0.1.0",
+    "@game-center/dpop-session-middleware": "jsr:@game-center/dpop-session-middleware@^0.1.0"
   },
   "permissions": {
     "default": {
@@ -26,8 +35,15 @@
         "TURSO_DATABASE_URL",
         "TURSO_AUTH_TOKEN"
       ],
-      "net": ["id.kbn.one", "*.turso.io", "localhost", "127.0.0.1"],
-      "read": ["../bundled"]
+      "net": [
+        "id.kbn.one",
+        "*.turso.io",
+        "localhost",
+        "127.0.0.1"
+      ],
+      "read": [
+        "../bundled"
+      ]
     }
   }
 }

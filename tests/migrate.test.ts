@@ -2,9 +2,9 @@
  * Migrations and schema, exercised through the CLI the deploy actually runs.
  *
  * `deno task db` wraps `@kuboon/remix-data-table-sqlite-turso/cli`, so the tests
- * spawn that same command against a throwaway file database rather than
- * reimplementing the runner. What is under test is our migration SQL — that it
- * applies, reverts, and produces the constraints the design relies on.
+ * spawn that same command rather than reimplementing the runner. What is under
+ * test is our migration SQL — that it applies, reverts, and produces the
+ * constraints the design relies on.
  *
  * Lives here rather than under `server/` because the CLI and the local libSQL
  * client both need `-A`, while the server's unit tests run under the
@@ -17,81 +17,19 @@ import {
   assertRejects,
   assertStringIncludes,
 } from "@std/assert";
-import { type Client, createClient } from "@libsql/client/node";
 
-const CLI = "jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0/cli";
-const MIGRATIONS = new URL("../db/migrations", import.meta.url).pathname;
+import {
+  assertOk,
+  migratedDb,
+  runDb,
+  tableNames,
+  withDb,
+} from "./support/db.ts";
 
-interface CliResult {
-  readonly code: number;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
-/** Run one CLI command against `url`, the same way `deno task db` does. */
-async function db(
-  url: string,
-  ...args: string[]
-): Promise<CliResult> {
-  const command = new Deno.Command(Deno.execPath(), {
-    args: ["run", "-A", CLI, ...args, "--url", url, "--migrations", MIGRATIONS],
-    stdout: "piped",
-    stderr: "piped",
-  });
-  const { code, stdout, stderr } = await command.output();
-  return {
-    code,
-    stdout: new TextDecoder().decode(stdout),
-    stderr: new TextDecoder().decode(stderr),
-  };
-}
-
-/** Assert the command succeeded, surfacing its output when it did not. */
-function assertOk(result: CliResult, what: string): CliResult {
-  assertEquals(
-    result.code,
-    0,
-    `${what} exited ${result.code}\n${result.stdout}\n${result.stderr}`,
-  );
-  return result;
-}
-
-/**
- * Give `run` a throwaway file-backed database plus a client on it, and clean up
- * afterwards. A file rather than `:memory:` because the CLI and the client are
- * separate connections — and separate processes — so an in-memory database
- * would not be shared between them.
- */
-async function withDb(
-  run: (url: string, client: Client) => Promise<void>,
-): Promise<void> {
-  const dir = await Deno.makeTempDir({ prefix: "game-center-test-" });
-  const url = `file:${dir}/test.db`;
-  const client = createClient({ url });
-  try {
-    await run(url, client);
-  } finally {
-    client.close();
-    await Deno.remove(dir, { recursive: true });
-  }
-}
-
-async function tableNames(client: Client): Promise<string[]> {
-  const result = await client.execute(
-    "select name from sqlite_master where type = 'table' order by name",
-  );
-  return result.rows.map((row) => String(row.name));
-}
-
-/** A migrated database, ready for the schema assertions. */
-async function migrated(url: string): Promise<void> {
-  assertOk(await db(url, "migrate"), "migrate");
-}
+const LATEST_MIGRATION = "20260819000000";
 
 Deno.test("migrate creates every table the design declares", async () => {
-  await withDb(async (url, client) => {
-    await migrated(url);
-
+  await migratedDb(async (client) => {
     const tables = await tableNames(client);
     for (
       const table of [
@@ -100,41 +38,48 @@ Deno.test("migrate creates every table the design declares", async () => {
         "achievements",
         "user_achievements",
         "api_tokens",
-        "dpop_sessions",
+        "kv",
       ]
     ) {
       assert(tables.includes(table), `missing table: ${table}`);
     }
+    // Sessions moved into the generic kv store.
+    assertEquals(tables.includes("dpop_sessions"), false);
   });
 });
 
 Deno.test("migrate is a no-op once applied", async () => {
   await withDb(async (url) => {
-    await migrated(url);
-    assertOk(await db(url, "migrate"), "second migrate");
+    assertOk(await runDb(url, "migrate"), "migrate");
+    assertOk(await runDb(url, "migrate"), "second migrate");
     assertStringIncludes(
-      assertOk(await db(url, "status"), "status").stdout,
-      "20260818000000",
+      assertOk(await runDb(url, "status"), "status").stdout,
+      LATEST_MIGRATION,
     );
   });
 });
 
-Deno.test("rollback reverts the schema", async () => {
+Deno.test("rollback reverts one migration at a time", async () => {
   await withDb(async (url, client) => {
-    await migrated(url);
-    assertOk(await db(url, "rollback", "--step", "1"), "rollback");
+    assertOk(await runDb(url, "migrate"), "migrate");
 
-    const tables = await tableNames(client);
-    for (const table of ["users", "games", "achievements"]) {
+    // Undo the kv migration: sessions go back to their own table.
+    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback kv");
+    let tables = await tableNames(client);
+    assert(tables.includes("dpop_sessions"), "dpop_sessions was not restored");
+    assertEquals(tables.includes("kv"), false);
+
+    // Undo the initial migration: nothing of ours is left.
+    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback initial");
+    tables = await tableNames(client);
+    for (const table of ["users", "games", "achievements", "dpop_sessions"]) {
       assertEquals(tables.includes(table), false, `${table} survived rollback`);
     }
   });
 });
 
 Deno.test("schema accepts a full unlock round trip", async () => {
-  await withDb(async (url, client) => {
-    await migrated(url);
-
+  await migratedDb(async (client) => {
     await client.execute({
       sql: "insert into users (external_id, display_name) values (?, ?)",
       args: ["idp-user-1", "kuboon"],
@@ -165,8 +110,7 @@ Deno.test("schema accepts a full unlock round trip", async () => {
 });
 
 Deno.test("schema enforces the constraints unlocking relies on", async () => {
-  await withDb(async (url, client) => {
-    await migrated(url);
+  await migratedDb(async (client) => {
     await client.execute(
       "insert into users (external_id, display_name) values ('u', 'u')",
     );

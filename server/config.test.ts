@@ -16,3 +16,18 @@ Deno.test("falls back to empty strings when unset", () => {
   assertEquals(config.tursoDatabaseUrl, "");
   assertEquals(config.tursoAuthToken, "");
 });
+
+Deno.test("defaults the IdP and hub origins to production", () => {
+  const config = readConfig({});
+  assertEquals(config.idpOrigin, "https://id.kbn.one");
+  assertEquals(config.rpOrigin, "https://ga-cen.kbn.one");
+});
+
+Deno.test("lets the environment point at a local IdP", () => {
+  const config = readConfig({
+    IDP_ORIGIN: "http://localhost:8001",
+    RP_ORIGIN: "http://localhost:8000",
+  });
+  assertEquals(config.idpOrigin, "http://localhost:8001");
+  assertEquals(config.rpOrigin, "http://localhost:8000");
+});

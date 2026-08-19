@@ -160,7 +160,9 @@ id.kbn.one は OIDC ではなく、**DPoP** (RFC 9449)によるパスキー認�
 
 game-center サーバ側は、reference の `remix-dpop-session-middleware` パターンで受ける。
 ブラウザからの認証付きリクエストは DPoP 証明を伴い、ミドルウェアが証明を検証して thumbprint をセッション ID とするサーバセッションを開く。
-セッションストレージは reference の Deno KV 実装を Turso 実装(`packages/session_storage_turso`)に差し替える。
+セッションストレージは reference の Deno KV 実装を Turso に差し替える。
+`@kuboon/kv` の `TursoKvRepo` が汎用の `kv` テーブルを提供するので、その上に `SessionStorage` アダプタ(`packages/session_storage_kv`)を薄く重ねる。
+アダプタとミドルウェアはどちらも未公開のため、id.kbn.one と deno-remix-reference と同じくワークスペース内に持つ。
 
 game-center サーバが userId を信頼する根拠は、`/session` 応答の **jws** である。
 これは IdP が ES256 署名した JWT で、`sub`(userId)、`iss`、`nbf` / `exp`(1時間)、`jti` に加え、`cnf.jkt` にブラウザの DPoP 鍵 thumbprint が入る(RFC 9449 の鍵バインド)。
@@ -231,10 +233,13 @@ create table api_tokens (
   last_used_at  text
 );
 
-create table dpop_sessions (
-  thumbprint    text primary key,          -- DPoP 鍵の JWK thumbprint
-  data          text not null,             -- セッションデータ (JSON)
-  expires_at    text not null
+-- DPoP セッションを含む揮発データは、`@kuboon/kv` の TursoKvRepo が使う
+-- 汎用の kv テーブルに入る(セッションのキーは DPoP 鍵の JWK thumbprint)。
+create table kv (
+  key           text primary key,
+  value         text not null,
+  expires_at    integer,
+  version       integer not null default 0
 );
 ```
 
@@ -371,7 +376,8 @@ bundler/                     # Deno.bundle + Tailwind ビルド → bundled/
 packages/
   protocol/                  # gamecenter.json の JSON Schema と共有型、検証関数
   sdk/                       # @kuboon/game-center-sdk (単一ファイル、JSR 公開)
-  session_storage_turso/     # Turso を背にした SessionStorage 実装(KV 代替)
+  session_storage_kv/        # KvRepo を SessionStorage に橋渡しする
+  dpop_session_middleware/   # DPoP セッションミドルウェア
 action/                      # ゲーム登録用 composite action (action.yml)
 skills/
   game-center/SKILL.md       # ゲーム開発者(LLM)向け Claude skill

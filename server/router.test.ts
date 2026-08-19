@@ -21,3 +21,26 @@ Deno.test("GET / with the frame header serves the fragment only", async () => {
   assertStringIncludes(html, "<main");
   assertEquals(html.includes("<html"), false);
 });
+
+Deno.test("GET /me serves the account page", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/me", { headers: { "rmx-frame": "1" } }),
+  );
+  assertEquals(response.status, 200);
+
+  const html = await response.text();
+  assertStringIncludes(html, "マイページ");
+  assertStringIncludes(html, "アカウント");
+});
+
+Deno.test("POST /api/internal/session refuses a request with no DPoP proof", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/internal/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jws: "whatever" }),
+    }),
+  );
+  assertEquals(response.status, 401);
+  assertEquals(response.headers.get("cache-control"), "no-store");
+});
