@@ -238,10 +238,12 @@ create table dpop_sessions (
 );
 ```
 
-マイグレーションは `server/db/migrations/` に連番 SQL で置き、適用済みの名前を `schema_migrations` テーブルに記録する軽量な仕組みを自作する(この規模で外部ツールは要らない)。
+マイグレーションは [remix-db-migrations-deno](https://github.com/kuboon/kuboon-remix-utils/tree/main/plugins/remix-db-migrations-deno) の規約に従う。
+`db/migrations/` に `YYYYMMDDHHmmss_name/` ディレクトリを作り、`up.sql` と `down.sql` を置く。
+Remix CLI の `remix db` は remix.json が sqlite / postgres / mysql しか受け付けず Turso を表現できないため、同じ規約を実装した `@kuboon/remix-data-table-sqlite-turso` の CLI を使う。
+こちらは `remix db` にない rollback も持つ。
 適用はサーバ起動時ではなく、デプロイ手順の一段(`deno task migrate`)として行う。
 Deno Deploy ではリクエストごとに isolate が起動するため、起動時適用にすると各 isolate がマイグレーションを競って実行することになる。
-1つのマイグレーションは、その適用記録の書き込みまで含めて1トランザクションで実行し、途中で失敗した場合は何も残さない。
 
 ## API 一覧
 

@@ -1,32 +1,75 @@
 /**
- * Migration runner and schema checks against a real libSQL database.
+ * Migrations and schema, exercised through the CLI the deploy actually runs.
  *
- * Uses `@libsql/client/node` against a file in a temp dir — no network and no
- * Turso credentials, but the same SQLite engine and the same `Client` API the
- * app drives in production. A file rather than `:memory:` because the node
- * client opens more than one connection and each would get its own empty
- * in-memory database.
+ * `deno task db` wraps `@kuboon/remix-data-table-sqlite-turso/cli`, so the tests
+ * spawn that same command against a throwaway file database rather than
+ * reimplementing the runner. What is under test is our migration SQL — that it
+ * applies, reverts, and produces the constraints the design relies on.
  *
- * Lives here rather than under `server/` because the native libSQL addon needs
- * `-A`, while the server's unit tests run under the workspace's `-P` default.
+ * Lives here rather than under `server/` because the CLI and the local libSQL
+ * client both need `-A`, while the server's unit tests run under the
+ * workspace's `-P` default.
  */
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+} from "@std/assert";
 import { type Client, createClient } from "@libsql/client/node";
 
-import {
-  appliedMigrations,
-  applyMigrations,
-  applyScript,
-  MIGRATIONS,
-} from "../server/db/migrate.ts";
+const CLI = "jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0/cli";
+const MIGRATIONS = new URL("../db/migrations", import.meta.url).pathname;
 
-/** Open a throwaway file-backed database, and clean it up afterwards. */
-async function withDb(run: (client: Client) => Promise<void>): Promise<void> {
+interface CliResult {
+  readonly code: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+/** Run one CLI command against `url`, the same way `deno task db` does. */
+async function db(
+  url: string,
+  ...args: string[]
+): Promise<CliResult> {
+  const command = new Deno.Command(Deno.execPath(), {
+    args: ["run", "-A", CLI, ...args, "--url", url, "--migrations", MIGRATIONS],
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const { code, stdout, stderr } = await command.output();
+  return {
+    code,
+    stdout: new TextDecoder().decode(stdout),
+    stderr: new TextDecoder().decode(stderr),
+  };
+}
+
+/** Assert the command succeeded, surfacing its output when it did not. */
+function assertOk(result: CliResult, what: string): CliResult {
+  assertEquals(
+    result.code,
+    0,
+    `${what} exited ${result.code}\n${result.stdout}\n${result.stderr}`,
+  );
+  return result;
+}
+
+/**
+ * Give `run` a throwaway file-backed database plus a client on it, and clean up
+ * afterwards. A file rather than `:memory:` because the CLI and the client are
+ * separate connections — and separate processes — so an in-memory database
+ * would not be shared between them.
+ */
+async function withDb(
+  run: (url: string, client: Client) => Promise<void>,
+): Promise<void> {
   const dir = await Deno.makeTempDir({ prefix: "game-center-test-" });
-  const client = createClient({ url: `file:${dir}/test.db` });
+  const url = `file:${dir}/test.db`;
+  const client = createClient({ url });
   try {
-    await run(client);
+    await run(url, client);
   } finally {
     client.close();
     await Deno.remove(dir, { recursive: true });
@@ -40,10 +83,14 @@ async function tableNames(client: Client): Promise<string[]> {
   return result.rows.map((row) => String(row.name));
 }
 
-Deno.test("applies every migration to an empty database", async () => {
-  await withDb(async (client) => {
-    const applied = await applyMigrations(client);
-    assertEquals(applied, [...MIGRATIONS]);
+/** A migrated database, ready for the schema assertions. */
+async function migrated(url: string): Promise<void> {
+  assertOk(await db(url, "migrate"), "migrate");
+}
+
+Deno.test("migrate creates every table the design declares", async () => {
+  await withDb(async (url, client) => {
+    await migrated(url);
 
     const tables = await tableNames(client);
     for (
@@ -54,57 +101,39 @@ Deno.test("applies every migration to an empty database", async () => {
         "user_achievements",
         "api_tokens",
         "dpop_sessions",
-        "schema_migrations",
       ]
     ) {
       assert(tables.includes(table), `missing table: ${table}`);
     }
-    assertEquals(await appliedMigrations(client), new Set(MIGRATIONS));
   });
 });
 
-Deno.test("is a no-op on an already migrated database", async () => {
-  await withDb(async (client) => {
-    await applyMigrations(client);
-    assertEquals(await applyMigrations(client), []);
-  });
-});
-
-Deno.test("rolls a failed migration back whole", async () => {
-  await withDb(async (client) => {
-    await applyMigrations(client);
-
-    await assertRejects(() =>
-      applyScript(
-        client,
-        "002_broken.sql",
-        "create table half_applied (id integer primary key);\nthis is not sql;",
-      )
-    );
-
-    assertEquals((await tableNames(client)).includes("half_applied"), false);
-    assertEquals(
-      (await appliedMigrations(client)).has("002_broken.sql"),
-      false,
+Deno.test("migrate is a no-op once applied", async () => {
+  await withDb(async (url) => {
+    await migrated(url);
+    assertOk(await db(url, "migrate"), "second migrate");
+    assertStringIncludes(
+      assertOk(await db(url, "status"), "status").stdout,
+      "20260818000000",
     );
   });
 });
 
-Deno.test("enforces the foreign keys the schema declares", async () => {
-  await withDb(async (client) => {
-    await applyMigrations(client);
+Deno.test("rollback reverts the schema", async () => {
+  await withDb(async (url, client) => {
+    await migrated(url);
+    assertOk(await db(url, "rollback", "--step", "1"), "rollback");
 
-    await assertRejects(() =>
-      client.execute(
-        "insert into games (id, owner_id, title, url) values ('g', 999, 'g', 'https://example.com/')",
-      )
-    );
+    const tables = await tableNames(client);
+    for (const table of ["users", "games", "achievements"]) {
+      assertEquals(tables.includes(table), false, `${table} survived rollback`);
+    }
   });
 });
 
 Deno.test("schema accepts a full unlock round trip", async () => {
-  await withDb(async (client) => {
-    await applyMigrations(client);
+  await withDb(async (url, client) => {
+    await migrated(url);
 
     await client.execute({
       sql: "insert into users (external_id, display_name) values (?, ?)",
@@ -135,60 +164,40 @@ Deno.test("schema accepts a full unlock round trip", async () => {
   });
 });
 
-Deno.test("unlocking twice collides on the primary key", async () => {
-  await withDb(async (client) => {
-    await applyMigrations(client);
+Deno.test("schema enforces the constraints unlocking relies on", async () => {
+  await withDb(async (url, client) => {
+    await migrated(url);
     await client.execute(
       "insert into users (external_id, display_name) values ('u', 'u')",
     );
     await client.execute(
       "insert into games (id, owner_id, title, url) values ('g', 1, 'g', 'https://example.com/')",
     );
-    await client.execute(
-      "insert into achievements (game_id, key, title) values ('g', 'k', 'k')",
-    );
-    const insert =
-      "insert into user_achievements (user_id, achievement_id, via) values (1, 1, 'claim')";
+    const achievement =
+      "insert into achievements (game_id, key, title) values ('g', 'k', 'k')";
+    await client.execute(achievement);
 
-    await client.execute(insert);
-    await assertRejects(() => client.execute(insert));
-  });
-});
+    // One achievement key per game.
+    await assertRejects(() => client.execute(achievement));
 
-Deno.test("rejects an unknown unlock source", async () => {
-  await withDb(async (client) => {
-    await applyMigrations(client);
-    await client.execute(
-      "insert into users (external_id, display_name) values ('u', 'u')",
-    );
-    await client.execute(
-      "insert into games (id, owner_id, title, url) values ('g', 1, 'g', 'https://example.com/')",
-    );
-    await client.execute(
-      "insert into achievements (game_id, key, title) values ('g', 'k', 'k')",
+    // Foreign keys are on: libSQL enables them, unlike stock SQLite.
+    await assertRejects(() =>
+      client.execute(
+        "insert into games (id, owner_id, title, url) values ('x', 999, 'x', 'https://example.com/')",
+      )
     );
 
+    // Only the three unlock paths the protocol defines.
     await assertRejects(() =>
       client.execute(
         "insert into user_achievements (user_id, achievement_id, via) values (1, 1, 'telepathy')",
       )
     );
-  });
-});
 
-Deno.test("keeps one achievement key per game", async () => {
-  await withDb(async (client) => {
-    await applyMigrations(client);
-    await client.execute(
-      "insert into users (external_id, display_name) values ('u', 'u')",
-    );
-    await client.execute(
-      "insert into games (id, owner_id, title, url) values ('g', 1, 'g', 'https://example.com/')",
-    );
-    const insert =
-      "insert into achievements (game_id, key, title) values ('g', 'k', 'k')";
-
-    await client.execute(insert);
-    await assertRejects(() => client.execute(insert));
+    // Unlocking twice collides on the primary key.
+    const unlock =
+      "insert into user_achievements (user_id, achievement_id, via) values (1, 1, 'claim')";
+    await client.execute(unlock);
+    await assertRejects(() => client.execute(unlock));
   });
 });

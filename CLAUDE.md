@@ -11,7 +11,9 @@ Deno workspace。
 - `server/` — Remix v3 fetch-router のハブサーバ。`routes.ts`
   にルート定義、`controllers/` に各ページと API、`ui/document.tsx`
   がシェル、`utils/render.tsx` が shell/frame の描画分岐、`config.ts`
-  が環境変数、`db/` が Turso 接続とマイグレーション
+  が環境変数、`db/client.ts` が Turso 接続
+- `db/migrations/` — マイグレーション。`YYYYMMDDHHmmss_name/up.sql` と
+  `down.sql`
 - `client/` — ブラウザエントリ。`@remix-run/ui` の `run()` が clientEntry を
   hydrate し、`<Frame name="content">` のナビゲーションを担う
 - `bundler/` — `Deno.bundle` による JS ビルドと Tailwind CSS ビルド。出力は
@@ -27,6 +29,7 @@ deno task dev     # bundle してから開発サーバ起動 (http://localhost:8
 deno task test    # テスト (-P の単体テスト + tests/ の -A テスト)
 deno task check   # deno check + lint + fmt --check
 deno task migrate # 未適用のマイグレーションを Turso に適用
+deno task db …   # migrate / rollback / status / seed / reset / wipe
 ```
 
 `bundled/` は `deno task bundle` で生成する。 サーバは起動時にこれを
@@ -39,8 +42,16 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 
 - サーバ本体は `@libsql/client/web`(fetch
   ベース)を使う。ネイティブアドオンを読み込まないので Deno Deploy で動く
-- スキーマ変更は `server/db/migrations/` に連番 SQL
-  を足し、`server/db/migrate.ts` の `MIGRATIONS` に名前を追加する
+- マイグレーションは
+  [remix-db-migrations-deno](https://github.com/kuboon/kuboon-remix-utils/tree/main/plugins/remix-db-migrations-deno)
+  の規約に従う。`remix db` は remix.json が Turso
+  アダプタを表現できないため使えず、 代わりに
+  `@kuboon/remix-data-table-sqlite-turso/cli` を `deno task db` で叩く
+- スキーマ変更は `db/migrations/` に `YYYYMMDDHHmmss_name/` ディレクトリを作り、
+  `up.sql` と(戻せる変更なら)`down.sql` を置く。名前は14桁の数字 + `_` +
+  名前で、 外れると全体がエラーになる
+- 適用状況は `data_table_migrations` テーブルが持つ。テーブル名を変えると
+  適用済みのマイグレーションが再実行される
 - マイグレーションはデプロイ手順の一段として `deno task migrate`
   で適用する。起動時には適用しない(Deno Deploy では isolate ごとに競合するため)
 - libSQL は外部キーを既定で有効にする。参照先を作り直すマイグレーションでは
