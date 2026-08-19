@@ -9,6 +9,8 @@
 export interface Env {
   readonly TURSO_DATABASE_URL?: string;
   readonly TURSO_AUTH_TOKEN?: string;
+  readonly IDP_ORIGIN?: string;
+  readonly RP_ORIGIN?: string;
 }
 
 export interface Config {
@@ -16,6 +18,10 @@ export interface Config {
   readonly tursoDatabaseUrl: string;
   /** Turso auth token. Empty for local databases that need none. */
   readonly tursoAuthToken: string;
+  /** Origin of the IdP that authenticates players. */
+  readonly idpOrigin: string;
+  /** This hub's own origin, used as the OAuth-style `clientId` at the IdP. */
+  readonly rpOrigin: string;
 }
 
 /** Build a {@link Config} from the given environment. */
@@ -23,11 +29,18 @@ export function readConfig(env: Env): Config {
   return {
     tursoDatabaseUrl: env.TURSO_DATABASE_URL ?? "",
     tursoAuthToken: env.TURSO_AUTH_TOKEN ?? "",
+    idpOrigin: env.IDP_ORIGIN ?? "https://id.kbn.one",
+    rpOrigin: env.RP_ORIGIN ?? "https://ga-cen.kbn.one",
   };
 }
 
 /** Variables passed to {@link readConfig} by {@link getConfig}. */
-const ENV_KEYS = ["TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"] as const;
+const ENV_KEYS = [
+  "TURSO_DATABASE_URL",
+  "TURSO_AUTH_TOKEN",
+  "IDP_ORIGIN",
+  "RP_ORIGIN",
+] as const;
 
 let cached: Config | undefined;
 

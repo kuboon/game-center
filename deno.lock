@@ -2,18 +2,24 @@
   "version": "5",
   "specifiers": {
     "jsr:@deno/loader@0.5": "0.5.0",
+    "jsr:@kuboon/dpop@0.2": "0.2.0",
+    "jsr:@kuboon/kv@0.2": "0.2.0",
     "jsr:@kuboon/remix-data-table-sqlite-turso@0.3": "0.3.0",
     "jsr:@kuboon/tailwindcss-deno@~0.1.3": "0.1.6",
+    "jsr:@panva/jose@^6.2.3": "6.2.9",
     "jsr:@std/assert@^1.0.19": "1.0.19",
+    "jsr:@std/encoding@1.0.10": "1.0.10",
     "jsr:@std/encoding@^1.0.11": "1.0.11",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
     "jsr:@std/path@^1.1.6": "1.1.6",
+    "jsr:@std/ulid@1": "1.0.0",
     "npm:@jridgewell/remapping@^2.3.5": "2.3.5",
     "npm:@libsql/client@~0.17.4": "0.17.4",
     "npm:@remix-run/data-table@0.4": "0.4.0",
     "npm:@remix-run/fetch-router@0.21.0": "0.21.0",
     "npm:@remix-run/response@0.3.8": "0.3.8",
+    "npm:@remix-run/session@~0.4.2": "0.4.2",
     "npm:@remix-run/static-middleware@0.4.13": "0.4.13",
     "npm:@remix-run/ui@0.5": "0.5.0",
     "npm:@tailwindcss/oxide@^4.1.18": "4.3.3",
@@ -28,6 +34,19 @@
     "@deno/loader@0.5.0": {
       "integrity": "a6d94408de5e6bacac404f8f6963c8b8cc278cfd1a878aa2f06b34a083d6bfee"
     },
+    "@kuboon/dpop@0.2.0": {
+      "integrity": "df4fcec89be1f125a8934147149303ee0d9dadf6d2bd2d9aa829e0eb182d25aa",
+      "dependencies": [
+        "jsr:@std/encoding@1.0.10"
+      ]
+    },
+    "@kuboon/kv@0.2.0": {
+      "integrity": "82b0d2d58e99c893dc667814a606af74ee04f62235d120d57e0d8e4b68ed74c3",
+      "dependencies": [
+        "jsr:@std/ulid",
+        "npm:@libsql/client"
+      ]
+    },
     "@kuboon/remix-data-table-sqlite-turso@0.3.0": {
       "integrity": "71944c5560e02af4895493646eaad06a5fd6a15cc23cd1854028ed7aa35efba6",
       "dependencies": [
@@ -39,7 +58,7 @@
       "integrity": "ba3f8f5f43aafee7d87b8c7ae2a0545268c4dcacf599f3aa0d500da2add7c43a",
       "dependencies": [
         "jsr:@deno/loader",
-        "jsr:@std/encoding",
+        "jsr:@std/encoding@^1.0.11",
         "jsr:@std/path",
         "npm:@jridgewell/remapping",
         "npm:lightningcss",
@@ -48,11 +67,17 @@
         "npm:tailwindcss@^4.3.3"
       ]
     },
+    "@panva/jose@6.2.9": {
+      "integrity": "721551334c01e272cec5034211d063ac5bd51adc17cf18f4cf0f79fdefd672a7"
+    },
     "@std/assert@1.0.19": {
       "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
       "dependencies": [
         "jsr:@std/internal@^1.0.12"
       ]
+    },
+    "@std/encoding@1.0.10": {
+      "integrity": "8783c6384a2d13abd5e9e87a7ae0520a30e9f56aeeaa3bdf910a3eaaf5c811a1"
     },
     "@std/encoding@1.0.11": {
       "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
@@ -65,6 +90,9 @@
       "dependencies": [
         "jsr:@std/internal@^1.0.14"
       ]
+    },
+    "@std/ulid@1.0.0": {
+      "integrity": "d41c3d27a907714413649fee864b7cde8d42ee68437d22b79d5de4f81d808780"
     }
   },
   "npm": {
@@ -223,6 +251,9 @@
     },
     "@remix-run/route-pattern@0.24.0": {
       "integrity": "sha512-w0/lhgY40l2GrBQjJIOeYWIuKm1rxlOsc9Hvt+nyydnka0v4aI9Vv0VK4XzLD3aP08JzGtTlxFxwf1PZ8SGdLg=="
+    },
+    "@remix-run/session@0.4.2": {
+      "integrity": "sha512-NGzu6/gC5xD/tq40W0WqzTt4JhCdSCIwDHM1aa13JBqb4Ml/Mb0kmXqjfOe/gBYfu6AA11nRQ/BJyr+VduTodA=="
     },
     "@remix-run/static-middleware@0.4.13": {
       "integrity": "sha512-32oI2hbVR+GN/sduxOZSY1WNaEasKDm7X7o79eBGG5E78dV5mi0ijGLldHfAEazyRQyqeYzvG292RWUfkFJetA==",
@@ -475,16 +506,38 @@
       },
       "client": {
         "dependencies": [
+          "jsr:@kuboon/dpop@0.2",
           "jsr:@std/assert@^1.0.19",
           "npm:@remix-run/ui@0.5"
         ]
       },
+      "packages/dpop_session_middleware": {
+        "dependencies": [
+          "jsr:@kuboon/dpop@0.2",
+          "jsr:@std/assert@^1.0.19",
+          "npm:@remix-run/fetch-router@0.21.0",
+          "npm:@remix-run/session@~0.4.2"
+        ]
+      },
+      "packages/session_storage_kv": {
+        "dependencies": [
+          "jsr:@kuboon/kv@0.2",
+          "jsr:@std/assert@^1.0.19",
+          "npm:@remix-run/session@~0.4.2"
+        ]
+      },
       "server": {
         "dependencies": [
+          "jsr:@game-center/dpop-session-middleware@0.1",
+          "jsr:@game-center/session-storage-kv@0.1",
+          "jsr:@kuboon/dpop@0.2",
+          "jsr:@kuboon/kv@0.2",
+          "jsr:@panva/jose@^6.2.3",
           "jsr:@std/assert@^1.0.19",
           "npm:@libsql/client@~0.17.4",
           "npm:@remix-run/fetch-router@0.21.0",
           "npm:@remix-run/response@0.3.8",
+          "npm:@remix-run/session@~0.4.2",
           "npm:@remix-run/static-middleware@0.4.13",
           "npm:@remix-run/ui@0.5"
         ]

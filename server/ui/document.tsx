@@ -8,6 +8,7 @@
 
 import { Frame, type Handle } from "@remix-run/ui";
 
+import { NavAuth } from "../../client/nav_auth.tsx";
 import { routes } from "../routes.ts";
 
 type DocumentProps = {
@@ -34,6 +35,9 @@ export function Document(handle: Handle<DocumentProps>) {
             >
               game-center
             </a>
+          </div>
+          <div class="navbar-end">
+            <NavAuth returnTo={routes.me.href()} />
           </div>
         </header>
         <Frame

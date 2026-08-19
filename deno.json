@@ -3,7 +3,9 @@
     "./server",
     "./client",
     "./bundler",
-    "./tests"
+    "./tests",
+    "./packages/session_storage_kv",
+    "./packages/dpop_session_middleware"
   ],
   "tasks": {
     "dev": "deno task --cwd server dev",
@@ -21,14 +23,20 @@
     "permissions": "default"
   },
   "fmt": {
-    "exclude": ["docs/"]
+    "exclude": [
+      "docs/"
+    ]
   },
   "nodeModulesDir": "auto",
   "minimumDependencyAge": {
     "age": "P1D",
-    "exclude": ["jsr:@kuboon/*"]
+    "exclude": [
+      "jsr:@kuboon/*"
+    ]
   },
-  "unstable": ["bundle"],
+  "unstable": [
+    "bundle"
+  ],
   "compilerOptions": {
     "jsx": "react-jsx",
     "jsxImportSource": "@remix-run/ui"
