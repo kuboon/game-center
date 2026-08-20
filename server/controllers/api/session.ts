@@ -16,7 +16,12 @@ import type { Action } from "@remix-run/fetch-router";
 import { requireDb } from "../../db/client.ts";
 import { upsertUser } from "../../db/users.ts";
 import { IdpTokenError, verifyIdpToken } from "../../lib/idp_token.ts";
-import { DpopSession, SESSION_USER_ID } from "../../middleware/dpop.ts";
+import {
+  DpopProofError,
+  DpopSession,
+  SESSION_USER_ID,
+  sessionsArePersistent,
+} from "../../middleware/dpop.ts";
 import type { routes } from "../../routes.ts";
 
 const noStore = (response: Response): Response => {
@@ -26,11 +31,30 @@ const noStore = (response: Response): Response => {
 
 export const internalSessionAction = {
   async handler(context) {
-    // Absent unless the middleware verified a DPoP proof on this request.
+    // Absent unless the middleware verified a DPoP proof on this request. The
+    // reason it failed is worth returning: "missing-dpop-header" is a client
+    // that sent none, while "url-mismatch" means the proof was signed for a
+    // different URL than this server saw — a proxy rewriting the request URL,
+    // not anything the browser can fix.
     const session = context.get(DpopSession);
     if (!session) {
+      const reason = context.get(DpopProofError)?.reason ??
+        "missing-dpop-proof";
       return noStore(
-        Response.json({ error: "DPoP proof required" }, { status: 401 }),
+        Response.json({
+          error: "DPoP proof required",
+          reason,
+        }, { status: 401 }),
+      );
+    }
+
+    // Signing in writes a user row and a session that must outlive this
+    // isolate. Saying so beats accepting the token and forgetting it.
+    if (!sessionsArePersistent) {
+      return noStore(
+        Response.json({
+          error: "This deployment has no database configured",
+        }, { status: 503 }),
       );
     }
 

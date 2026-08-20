@@ -3,7 +3,12 @@ import { createSession, type Session } from "@remix-run/session";
 import type { SessionStorage } from "@remix-run/session";
 import { init, InMemoryKeyRepository } from "@kuboon/dpop";
 
-import { DpopSession, dpopSession, InMemoryReplayDetector } from "./mod.ts";
+import {
+  DpopProofError,
+  DpopSession,
+  dpopSession,
+  InMemoryReplayDetector,
+} from "./mod.ts";
 
 const URL_UNDER_TEST = "https://hub.example/api/internal/session";
 
@@ -71,7 +76,13 @@ async function run(
   request: Request,
   handler: (session: DpopSession | undefined) => Response = () =>
     new Response("ok"),
-): Promise<{ response: Response; session: DpopSession | undefined }> {
+): Promise<
+  {
+    response: Response;
+    session: DpopSession | undefined;
+    error: DpopProofError | undefined;
+  }
+> {
   const middleware = dpopSession({ sessionStorage: storage }) as unknown as (
     context: unknown,
     next: () => Promise<Response>,
@@ -79,6 +90,7 @@ async function run(
 
   const values = new Map<unknown, unknown>();
   let seen: DpopSession | undefined;
+  let seenError: DpopProofError | undefined;
   const context = {
     request,
     set: (key: unknown, value: unknown) => values.set(key, value),
@@ -88,9 +100,10 @@ async function run(
 
   const response = await middleware(context, () => {
     seen = values.get(DpopSession) as DpopSession | undefined;
+    seenError = values.get(DpopProofError) as DpopProofError | undefined;
     return Promise.resolve(handler(seen));
   });
-  return { response, session: seen };
+  return { response, session: seen, error: seenError };
 }
 
 Deno.test("passes through without a session when there is no proof", async () => {
@@ -103,7 +116,7 @@ Deno.test("passes through without a session when there is no proof", async () =>
 });
 
 Deno.test("ignores a proof that is not a valid JWS", async () => {
-  const { session } = await run(
+  const { session, error } = await run(
     memoryStorage(),
     new Request(URL_UNDER_TEST, {
       method: "POST",
@@ -111,6 +124,39 @@ Deno.test("ignores a proof that is not a valid JWS", async () => {
     }),
   );
   assertEquals(session, undefined);
+  assertEquals(error?.reason, "invalid-format");
+});
+
+Deno.test("reports a missing header as the reason", async () => {
+  const { error } = await run(
+    memoryStorage(),
+    new Request(URL_UNDER_TEST, { method: "POST" }),
+  );
+  assertEquals(error?.reason, "missing-dpop-header");
+});
+
+Deno.test("reports url-mismatch when the server saw a different URL", async () => {
+  // What a reverse proxy that rewrites the request URL produces: the proof is
+  // signed for the public URL, the server sees an internal one.
+  const { signedRequest } = await browser();
+  const signed = await signedRequest();
+  const rewritten = new Request("https://internal.local/api/internal/session", {
+    method: "POST",
+    headers: signed.headers,
+  });
+
+  const { session, error } = await run(memoryStorage(), rewritten);
+  assertEquals(session, undefined);
+  assertEquals(error?.reason, "url-mismatch");
+});
+
+Deno.test("reports method-mismatch when the proof was signed for another verb", async () => {
+  const { signedRequest } = await browser();
+  const signed = await signedRequest();
+  const asGet = new Request(URL_UNDER_TEST, { headers: signed.headers });
+
+  const { error } = await run(memoryStorage(), asGet);
+  assertEquals(error?.reason, "method-mismatch");
 });
 
 Deno.test("exposes a session keyed by the proof's thumbprint", async () => {

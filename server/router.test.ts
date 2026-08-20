@@ -33,7 +33,7 @@ Deno.test("GET /me serves the account page", async () => {
   assertStringIncludes(html, "アカウント");
 });
 
-Deno.test("POST /api/internal/session refuses a request with no DPoP proof", async () => {
+Deno.test("POST /api/internal/session says why the proof was refused", async () => {
   const response = await router.fetch(
     new Request("http://localhost/api/internal/session", {
       method: "POST",
@@ -43,4 +43,21 @@ Deno.test("POST /api/internal/session refuses a request with no DPoP proof", asy
   );
   assertEquals(response.status, 401);
   assertEquals(response.headers.get("cache-control"), "no-store");
+
+  const body = await response.json();
+  assertEquals(body.reason, "missing-dpop-header");
+});
+
+Deno.test("POST /api/internal/session names the real fault in a bad proof", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/internal/session", {
+      method: "POST",
+      headers: { "content-type": "application/json", DPoP: "not-a-proof" },
+      body: JSON.stringify({ jws: "whatever" }),
+    }),
+  );
+  assertEquals(response.status, 401);
+
+  const body = await response.json();
+  assertEquals(body.reason, "invalid-format");
 });
