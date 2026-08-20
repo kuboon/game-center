@@ -36,6 +36,15 @@ export function Document(handle: Handle<DocumentProps>) {
               game-center
             </a>
           </div>
+          <div class="navbar-center">
+            <a
+              class="btn btn-ghost btn-sm"
+              href={routes.dev.href()}
+              rmx-target="content"
+            >
+              開発者向け
+            </a>
+          </div>
           <div class="navbar-end">
             <NavAuth returnTo={routes.me.href()} />
           </div>

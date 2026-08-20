@@ -9,6 +9,7 @@ const CLIENT_ENTRIES = [
   "mod.ts",
   "nav_auth.tsx",
   "account_card.tsx",
+  "dev_console.tsx",
 ] as const;
 
 export async function buildJs(

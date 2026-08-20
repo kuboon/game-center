@@ -9,9 +9,21 @@
 import { createRouter, type Middleware } from "@remix-run/fetch-router";
 import { staticFiles } from "@remix-run/static-middleware";
 
+import {
+  internalGamesAction,
+  internalGamesRegisterAction,
+} from "./controllers/api/internal_games.ts";
+import {
+  internalTokensAction,
+  internalTokensCreateAction,
+  internalTokensDeleteAction,
+} from "./controllers/api/internal_tokens.ts";
+import { registryGamesAction } from "./controllers/api/registry_games.ts";
 import { internalSessionAction } from "./controllers/api/session.ts";
+import { devAction } from "./controllers/dev.tsx";
 import { homeAction } from "./controllers/home.tsx";
 import { meAction } from "./controllers/me.tsx";
+import { schemaAction } from "./controllers/schema.ts";
 import { dpop } from "./middleware/dpop.ts";
 import { routes } from "./routes.ts";
 
@@ -30,6 +42,16 @@ const router = createRouter({ middleware: [serveBundled, dpop] });
 
 router.get(routes.home, homeAction);
 router.get(routes.me, meAction);
+router.get(routes.dev, devAction);
+router.get(routes.schema, schemaAction);
+
 router.post(routes.internalSession, internalSessionAction);
+router.get(routes.internalGames, internalGamesAction);
+router.post(routes.internalGamesRegister, internalGamesRegisterAction);
+router.get(routes.internalTokens, internalTokensAction);
+router.post(routes.internalTokensCreate, internalTokensCreateAction);
+router.delete(routes.internalTokensDelete, internalTokensDeleteAction);
+
+router.post(routes.registryGames, registryGamesAction);
 
 export default router;

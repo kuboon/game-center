@@ -18,9 +18,10 @@ Deno workspace。
 - `client/` — ブラウザエントリ。`@remix-run/ui` の `run()` が clientEntry を
   hydrate し、`<Frame name="content">` のナビゲーションを担う。`session.ts` が
   DPoP セッションの共有ストア
-- `packages/` — ワークスペース内のライブラリ。`session_storage_kv`(KvRepo →
-  SessionStorage)と `dpop_session_middleware`(DPoP セッション)。どちらも
-  未公開のため id.kbn.one / deno-remix-reference から vendoring している
+- `packages/` — ワークスペース内のライブラリ。`protocol` が `gamecenter.json`
+  の型・検証・JSON Schema。`session_storage_kv`(KvRepo → SessionStorage)と
+  `dpop_session_middleware`(DPoP セッション)は未公開のため id.kbn.one /
+  deno-remix-reference から vendoring している
 - `bundler/` — `Deno.bundle` による JS ビルドと Tailwind CSS ビルド。出力は
   `bundled/`(git 管理外)
 - `assets/style.css` — Tailwind v4 + daisyUI の入力 CSS
@@ -76,6 +77,25 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   未設定ならミドルウェアごと外れ、サインアウト状態で動く
 - SSR には DPoP 証明を付けられないため、サインイン依存の UI は clientEntry
   にしてブラウザ側で埋める(`NavAuth` / `AccountCard`)
+
+## ゲーム登録
+
+ゲームは `gamecenter.json` ひとつを送って登録する。マニフェスト全体の upsert
+なので、同じ内容を何度送っても結果は変わらない。
+
+- 検証は `packages/protocol` の `parseManifest()`
+  だけが行う。エラーは最初の一件で止めず全部返す。JSON Schema は
+  `GET /schema/gamecenter.json` で配信し、`$schema` に書けばエディタが効く
+- 登録の口は二つあって、認証だけが違う。CI は API トークンで
+  `POST /api/registry/v1/games`、ダッシュボードは DPoP セッションで
+  `POST /api/internal/games`。処理は `server/lib/game_registration.ts`
+  を共有する
+- `id` は先着で所有者が決まり、以後その所有者しか書き換えられない
+  (`GameOwnershipError` → 403)
+- マニフェストから消えた実績は削除せず `achievements.retired = 1`
+  にする。解除済みのプレイヤーの記録を残すため
+- API トークンは SHA-256 ハッシュだけを保存し、平文は発行時のレスポンスにしか
+  現れない
 
 ## 規約
 

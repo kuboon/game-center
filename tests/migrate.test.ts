@@ -26,7 +26,7 @@ import {
   withDb,
 } from "./support/db.ts";
 
-const LATEST_MIGRATION = "20260819000000";
+const LATEST_MIGRATION = "20260820000000";
 
 Deno.test("migrate creates every table the design declares", async () => {
   await migratedDb(async (client) => {
@@ -45,6 +45,14 @@ Deno.test("migrate creates every table the design declares", async () => {
     }
     // Sessions moved into the generic kv store.
     assertEquals(tables.includes("dpop_sessions"), false);
+
+    // Dropping an achievement from a manifest retires it rather than deleting
+    // it, so the column has to be there.
+    const columns = await client.execute("pragma table_info(achievements)");
+    assert(
+      columns.rows.some((row) => String(row.name) === "retired"),
+      "achievements.retired is missing",
+    );
   });
 });
 
@@ -62,6 +70,15 @@ Deno.test("migrate is a no-op once applied", async () => {
 Deno.test("rollback reverts one migration at a time", async () => {
   await withDb(async (url, client) => {
     assertOk(await runDb(url, "migrate"), "migrate");
+
+    // Undo the retired column: the table is rebuilt without it.
+    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback retired");
+    const columns = await client.execute("pragma table_info(achievements)");
+    assertEquals(
+      columns.rows.some((row) => String(row.name) === "retired"),
+      false,
+      "achievements.retired survived rollback",
+    );
 
     // Undo the kv migration: sessions go back to their own table.
     assertOk(await runDb(url, "rollback", "--step", "1"), "rollback kv");

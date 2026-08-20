@@ -9,6 +9,7 @@
     "jsr:@panva/jose@^6.2.3": "6.2.9",
     "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/encoding@1.0.10": "1.0.10",
+    "jsr:@std/encoding@^1.0.10": "1.0.11",
     "jsr:@std/encoding@^1.0.11": "1.0.11",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
@@ -519,6 +520,11 @@
           "npm:@remix-run/session@~0.4.2"
         ]
       },
+      "packages/protocol": {
+        "dependencies": [
+          "jsr:@std/assert@^1.0.19"
+        ]
+      },
       "packages/session_storage_kv": {
         "dependencies": [
           "jsr:@kuboon/kv@0.2",
@@ -529,11 +535,13 @@
       "server": {
         "dependencies": [
           "jsr:@game-center/dpop-session-middleware@0.1",
+          "jsr:@game-center/protocol@0.1",
           "jsr:@game-center/session-storage-kv@0.1",
           "jsr:@kuboon/dpop@0.2",
           "jsr:@kuboon/kv@0.2",
           "jsr:@panva/jose@^6.2.3",
           "jsr:@std/assert@^1.0.19",
+          "jsr:@std/encoding@^1.0.10",
           "npm:@libsql/client@~0.17.4",
           "npm:@remix-run/fetch-router@0.21.0",
           "npm:@remix-run/response@0.3.8",
@@ -544,6 +552,7 @@
       },
       "tests": {
         "dependencies": [
+          "jsr:@game-center/protocol@0.1",
           "jsr:@std/assert@^1.0.19",
           "npm:@libsql/client@~0.17.4"
         ]

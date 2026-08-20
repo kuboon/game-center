@@ -43,6 +43,19 @@ export async function upsertUser(
   return user;
 }
 
+/** Look up a player by their local row id. */
+export async function findUserById(
+  client: Client,
+  id: number,
+): Promise<User | null> {
+  const result = await client.execute({
+    sql:
+      "select id, external_id, display_name, avatar_url from users where id = ?",
+    args: [id],
+  });
+  return toUser(result.rows[0]);
+}
+
 /** Look up a player by the IdP's user identifier. */
 export async function findUserByExternalId(
   client: Client,
@@ -53,7 +66,10 @@ export async function findUserByExternalId(
       "select id, external_id, display_name, avatar_url from users where external_id = ?",
     args: [externalId],
   });
-  const row = result.rows[0];
+  return toUser(result.rows[0]);
+}
+
+function toUser(row: Record<string, unknown> | undefined): User | null {
   if (!row) return null;
   return {
     id: Number(row.id),

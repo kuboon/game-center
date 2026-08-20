@@ -5,7 +5,8 @@
     "./bundler",
     "./tests",
     "./packages/session_storage_kv",
-    "./packages/dpop_session_middleware"
+    "./packages/dpop_session_middleware",
+    "./packages/protocol"
   ],
   "tasks": {
     "dev": "deno task --cwd server dev",

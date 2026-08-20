@@ -277,14 +277,24 @@ CORS ヘッダを返さないため、他オリジンのページからは呼べ
 | `POST /api/internal/session` | IdP の jws を検証して userId をセッションに確定 |
 | `GET /api/internal/me/achievements` | 全ゲーム横断の自分の実績一覧 |
 | `POST /api/internal/claim` | claim ページの確認ボタンから実績解除 |
-| `GET`/`POST`/`PATCH` `/api/internal/games` | 自分のゲームの登録・編集(Web UI 用) |
-| `POST /api/internal/tokens` | 登録用 API トークンの発行・失効 |
+| `GET`/`POST` `/api/internal/games` | 自分のゲームの一覧と、マニフェストの登録・編集(Web UI 用) |
+| `GET`/`POST` `/api/internal/tokens` | 登録用 API トークンの一覧と発行 |
+| `DELETE /api/internal/tokens/{id}` | API トークンの失効 |
+
+登録は POST だけで足り、PATCH は用意しない。
+マニフェスト全体の upsert が登録と編集を兼ねるので、部分更新の口があるとゲーム側のファイルとハブの状態が食い違いうる。
 
 **登録用 API** はブラウザ外(CI やサーバ)から呼ぶ前提で、CORS は設定しない。
 
 | メソッドとパス | 役割 |
 |---|---|
 | `POST /api/registry/v1/games` | gamecenter.json を upsert(初回は所有権確定) |
+
+内部用と登録用は同じ登録処理を共有し、認証だけが違う。
+GitHub Action が出すエラーと、ダッシュボードに貼り付けたときのエラーが一致していないと、開発者はどちらを信じてよいか分からなくなる。
+
+マニフェストの JSON Schema は `GET /schema/gamecenter.json` で配信する。
+`$schema` にこの URL を書けばエディタが補完でき、CORS は全開放にしてある。
 
 公開ゲーム一覧とゲーム詳細はハブのページ(SSR)として提供し、匿名向けの公開 JSON API は当面設けない。
 
@@ -408,6 +418,6 @@ M2 の実装手本は deno-remix-reference(RP 側)と id.kbn.one 本体(IdP 側)
 実装前に確認・決定が要るものを挙げる。
 
 - **AUTHORIZE_WHITELIST**:本番の id.kbn.one の許可リストに `ga-cen.kbn.one` が含まれること(`kbn.one` が登録済みならサブドメインとして許可される)の確認
-- **game id の予約と移譲**:slug の初回取得を先着とするか、審査を挟むか
+- **game id の予約と移譲**:slug の初回取得を先着とするか、審査を挟むか(M3 は先着で実装した)
 - **Artifacts の iframe 可否**:claude.ai 側の X-Frame-Options / CSP を実測し、postMessage モードの対象外と確定させる
 - **実績の改竄耐性**:自己申告モデルで開始する方針の最終確認(ランキング等を将来入れる場合は別途設計)
