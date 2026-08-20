@@ -80,22 +80,31 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 
 ## ゲーム登録
 
-ゲームは `gamecenter.json` ひとつを送って登録する。マニフェスト全体の upsert
-なので、同じ内容を何度送っても結果は変わらない。
+ゲームは `gamecenter.json` ひとつで自分を宣言する。マニフェスト全体の upsert
+なので、同じ内容を何度登録しても結果は変わらない。
 
-- 検証は `packages/protocol` の `parseManifest()`
-  だけが行う。エラーは最初の一件で止めず全部返す。JSON Schema は
-  `GET /schema/gamecenter.json` で配信し、`$schema` に書けばエディタが効く
-- 登録の口は二つあって、認証だけが違う。CI は API トークンで
-  `POST /api/registry/v1/games`、ダッシュボードは DPoP セッションで
-  `POST /api/internal/games`。処理は `server/lib/game_registration.ts`
-  を共有する
-- `id` は先着で所有者が決まり、以後その所有者しか書き換えられない
-  (`GameOwnershipError` → 403)
+- マニフェストの置き場所は3つで、ハブはこの順に探す。ゲームのページに
+  `<script type="application/gamecenter+json">` で埋め込む(主)、ページの隣に
+  `gamecenter.json` を置く、ダッシュボードに貼り付ける
+- **所有権はマニフェストの URL**。その URL にファイルを置けることが管理権の
+  証明になるので、資格情報が要らない。貼り付け登録だけは URL の裏付けが
+  ないのでアカウントに属する。両者は互いに乗っ取れない(`assertMayWrite`)
+- **`POST /api/registry/v1/games` は無認証**。`{ url }`
+  を受けてハブが読みに行く。
+  資格情報を足しても守るものが増えず、その受け渡しはゲームの作者(多くは LLM)が
+  自力で通せない唯一の手順になる。だから GitHub Action に secret がない
+- ハブが他人の URL を fetch するので `server/lib/manifest_fetch.ts` で囲う。
+  https のみ、private ホスト拒否、リダイレクトは毎ホップ検査、サイズ上限、
+  タイムアウト。応答の中身は呼び出し元に一切返らない(検証エラーは値ではなく
+  フィールド名を返す)ので、残る露出は blind に留まる
+- Claude Artifacts は公開 URL を fetch しても著者の HTML ではなく殻が返るため、
+  貼り付け登録を使う。登録は一度きりの行為で、解除は claim URL で動く
+- 検証は `packages/protocol` の `parseManifest()` だけが行う。エラーは最初の
+  一件で止めず全部返す。JSON Schema は `GET /schema/gamecenter.json` で配信する
+- マニフェストの `url`
+  は任意。取得元がゲームの場所だから。貼り付けのときだけ必須
 - マニフェストから消えた実績は削除せず `achievements.retired = 1`
   にする。解除済みのプレイヤーの記録を残すため
-- API トークンは SHA-256 ハッシュだけを保存し、平文は発行時のレスポンスにしか
-  現れない
 
 ## 実績解除
 

@@ -87,11 +87,11 @@ Deno.test("GET /schema/gamecenter.json serves the manifest schema", async () => 
 
   const schema = await response.json();
   assertEquals(schema.$id, "https://ga-cen.kbn.one/schema/gamecenter.json");
-  assertEquals(schema.required, ["id", "title", "url", "achievements"]);
+  assertEquals(schema.required, ["id", "title", "achievements"]);
 });
 
 Deno.test("the internal API refuses a request with no DPoP proof", async () => {
-  for (const path of ["/api/internal/games", "/api/internal/tokens"]) {
+  for (const path of ["/api/internal/games", "/api/internal/me/achievements"]) {
     const response = await router.fetch(new Request(`http://localhost${path}`));
     assertEquals(response.status, 401, path);
     assertEquals(response.headers.get("cache-control"), "no-store");
@@ -99,7 +99,7 @@ Deno.test("the internal API refuses a request with no DPoP proof", async () => {
   }
 });
 
-Deno.test("the registry API refuses a request with no token", async () => {
+Deno.test("the registry API asks for a url, not a credential", async () => {
   const response = await router.fetch(
     new Request("http://localhost/api/registry/v1/games", {
       method: "POST",
@@ -107,16 +107,19 @@ Deno.test("the registry API refuses a request with no token", async () => {
       body: "{}",
     }),
   );
-  assertEquals(response.status, 401);
-  assertStringIncludes((await response.json()).error, "Bearer");
+  // 400 rather than 401: there is nothing to authenticate, only something to
+  // read. What vouches for a registration is where the manifest was served
+  // from.
+  assertEquals(response.status, 400);
+  assertStringIncludes((await response.json()).error, "url is required");
 });
 
-Deno.test("the registry API refuses a malformed Authorization header", async () => {
+Deno.test("the internal API still needs a session to register anything", async () => {
   const response = await router.fetch(
-    new Request("http://localhost/api/registry/v1/games", {
+    new Request("http://localhost/api/internal/games", {
       method: "POST",
-      headers: { authorization: "Basic aaa", "content-type": "text/plain" },
-      body: "{}",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: "https://example.github.io/my-puzzle/" }),
     }),
   );
   assertEquals(response.status, 401);

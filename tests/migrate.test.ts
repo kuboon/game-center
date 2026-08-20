@@ -26,7 +26,7 @@ import {
   withDb,
 } from "./support/db.ts";
 
-const LATEST_MIGRATION = "20260820000000";
+const LATEST_MIGRATION = "20260820120000";
 
 Deno.test("migrate creates every table the design declares", async () => {
   await migratedDb(async (client) => {
@@ -37,7 +37,6 @@ Deno.test("migrate creates every table the design declares", async () => {
         "games",
         "achievements",
         "user_achievements",
-        "api_tokens",
         "kv",
       ]
     ) {
@@ -45,6 +44,8 @@ Deno.test("migrate creates every table the design declares", async () => {
     }
     // Sessions moved into the generic kv store.
     assertEquals(tables.includes("dpop_sessions"), false);
+    // The registry authenticates nobody, so there is nothing to store.
+    assertEquals(tables.includes("api_tokens"), false);
 
     // Dropping an achievement from a manifest retires it rather than deleting
     // it, so the column has to be there.
@@ -71,6 +72,10 @@ Deno.test("rollback reverts one migration at a time", async () => {
   await withDb(async (url, client) => {
     assertOk(await runDb(url, "migrate"), "migrate");
 
+    // Undo URL ownership: games belong to accounts again, and tokens return.
+    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback ownership");
+    assert((await tableNames(client)).includes("api_tokens"));
+
     // Undo the retired column: the table is rebuilt without it.
     assertOk(await runDb(url, "rollback", "--step", "1"), "rollback retired");
     const columns = await client.execute("pragma table_info(achievements)");
@@ -92,6 +97,37 @@ Deno.test("rollback reverts one migration at a time", async () => {
     for (const table of ["users", "games", "achievements", "dpop_sessions"]) {
       assertEquals(tables.includes(table), false, `${table} survived rollback`);
     }
+  });
+});
+
+Deno.test("a game belongs to a URL or an account, never both or neither", async () => {
+  await migratedDb(async (client) => {
+    await client.execute(
+      "insert into users (external_id, display_name) values ('u', 'u')",
+    );
+    const insert = (
+      id: string,
+      ownerId: number | null,
+      manifestUrl: string | null,
+    ) =>
+      client.execute({
+        sql: `insert into games (id, owner_id, manifest_url, title, url)
+              values (?, ?, ?, 't', 'https://example.com/')`,
+        args: [id, ownerId, manifestUrl],
+      });
+
+    await insert("pasted", 1, null);
+    await insert("fetched", null, "https://example.com/gamecenter.json");
+
+    // Neither: nothing could ever write to it again.
+    await assertRejects(() => insert("orphan", null, null));
+    // Both: two claims to the same game, with no rule for which wins.
+    await insert("hmm", 1, "https://example.com/other.json").then(
+      () => {
+        throw new Error("a game with both owners was accepted");
+      },
+      () => {},
+    );
   });
 });
 

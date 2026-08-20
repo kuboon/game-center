@@ -2,17 +2,19 @@
  * Who is calling, on each of the two authenticated surfaces.
  *
  * `/api/internal` is the hub's own frontend: a DPoP-proofed request whose
- * session carries the IdP userId. `/api/registry/v1` is CI and other servers:
- * a bearer token that acts as the player who issued it. `/api/game/v1` is a
- * registered game: a launch token that names both the player and the one game
- * it may act on. All three end up at a {@link User}, and all three fail with a
- * response rather than an exception so a controller can return it unchanged.
+ * session carries the IdP userId. `/api/game/v1` is a running game: a launch
+ * token that names both the player and the one game it may act on. Both end up
+ * at a {@link User}, and both fail with a response rather than an exception so
+ * a controller can return it unchanged.
+ *
+ * `/api/registry/v1` has no entry here, and that is the point: it authenticates
+ * nobody. What vouches for a registration is where the manifest was served
+ * from, not who sent the request.
  */
 
 import type { RequestContext } from "@remix-run/fetch-router";
 
 import { getDb } from "../db/client.ts";
-import { authenticateToken } from "../db/api_tokens.ts";
 import { findUserByExternalId, findUserById, type User } from "../db/users.ts";
 import {
   DpopProofError,
@@ -66,31 +68,6 @@ export async function authenticateSession(
     // was deleted. Treat it as signed out rather than resurrecting them.
     return { ok: false, response: apiError("Sign-in required", 401) };
   }
-  return { ok: true, user };
-}
-
-/**
- * The player an API token acts as.
- *
- * @param request The incoming request, for its Authorization header
- * @returns The player, or the response explaining why there is none
- */
-export async function authenticateApiToken(
-  request: Request,
-): Promise<Authentication> {
-  const token = bearerToken(request);
-  if (!token) {
-    return {
-      ok: false,
-      response: apiError("Authorization: Bearer <token> required", 401),
-    };
-  }
-
-  const client = getDb();
-  if (!client) return { ok: false, response: noDatabase() };
-
-  const user = await authenticateToken(client, token);
-  if (!user) return { ok: false, response: apiError("Unknown token", 401) };
   return { ok: true, user };
 }
 

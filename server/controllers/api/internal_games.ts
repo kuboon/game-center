@@ -1,9 +1,10 @@
 /**
- * /api/internal/games — the developer dashboard's view of its own games.
+ * /api/internal/games — the developer dashboard's own games.
  *
- * The same registration as the registry surface, reached with the session the
- * browser already has instead of a token, so someone can register a game
- * before they have set up CI.
+ * Two ways in. Registering a URL is the same call the registry surface makes,
+ * just started from a page instead of CI. Pasting a manifest is the path for a
+ * game the hub cannot fetch, and it is the only one that ties a game to an
+ * account.
  */
 
 import type { Action } from "@remix-run/fetch-router";
@@ -11,9 +12,12 @@ import type { Action } from "@remix-run/fetch-router";
 import { requireDb } from "../../db/client.ts";
 import { listAchievements, listGamesOwnedBy } from "../../db/games.ts";
 import { authenticateSession } from "../../lib/auth.ts";
-import { registerFromRequest } from "../../lib/game_registration.ts";
+import {
+  registerFromPaste,
+  registerFromUrl,
+} from "../../lib/game_registration.ts";
 import type { routes } from "../../routes.ts";
-import { apiJson } from "../../utils/api.ts";
+import { apiError, apiJson } from "../../utils/api.ts";
 
 export const internalGamesAction = {
   async handler(context) {
@@ -35,10 +39,20 @@ export const internalGamesRegisterAction = {
     const auth = await authenticateSession(context);
     if (!auth.ok) return auth.response;
 
-    return await registerFromRequest(
-      requireDb(),
-      auth.user.id,
-      context.request,
-    );
+    let body: { url?: unknown; manifest?: unknown };
+    try {
+      body = await context.request.json();
+    } catch {
+      return apiError("Body must be JSON", 400);
+    }
+
+    const client = requireDb();
+    if (typeof body.url === "string" && body.url) {
+      return await registerFromUrl(client, body.url);
+    }
+    if (body.manifest !== undefined) {
+      return await registerFromPaste(client, auth.user.id, body.manifest);
+    }
+    return apiError("Send either url or manifest", 400);
   },
 } satisfies Action<typeof routes.internalGamesRegister>;
