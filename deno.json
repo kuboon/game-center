@@ -14,6 +14,7 @@
     "bundle": "deno task --cwd bundler build",
     "db": "deno run -A jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0/cli",
     "migrate": "deno task db migrate",
+    "keygen": "deno run server/scripts/keygen.ts",
     "test": "deno test -P --ignore=tests && deno task --cwd tests test",
     "check": "deno check && deno lint && deno fmt --check"
   },

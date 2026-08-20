@@ -97,6 +97,27 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - API トークンは SHA-256 ハッシュだけを保存し、平文は発行時のレスポンスにしか
   現れない
 
+## 実績解除
+
+解除は3モードあるが、サーバ側の入口は2つ。ゲームからの REST
+(`POST /api/game/v1/unlock`、起動トークン)と、ハブ自身からの claim
+(`POST /api/internal/claim`、DPoP)。postMessage モードは M5 で `/play/{id}`
+の親ページが claim と同じ処理を呼ぶ。
+
+- 解除は冪等。2回目以降は `unlocked_at` も `via` も動かず、`score`
+  が保存済みより高いときだけ更新する(`server/db/unlocks.ts`)
+- `retired = 1` の実績は解除できない(`UnknownAchievementError` → 404)。
+  ただし解除済みの記録は `/me` に残り続ける
+- 起動トークンは `RP_SIGNING_KEY_JWK` で署名する短命 JWT。`sub` がローカル user
+  id、`aud` が game_id で、ゲームは自分の `aud` の範囲しか触れない。
+  鍵が未設定ならトークンは発行も検証もせず 503 を返す(isolate
+  ごとに鍵を生成すると検証が通らなくなるため)。鍵は `deno task keygen` で作る
+- トークンは URL のフラグメント(`#gctoken=…`)で渡す。ゲームのホスティングの
+  アクセスログに残さないため
+- `/api/game/v1/*` だけ CORS を全開放する(`server/middleware/game_cors.ts`)。
+  Cookie を使わずヘッダのトークンで認証するので開放してよい。エラー応答にも
+  ヘッダを付ける。付けないとゲームが 401 を読めず claim URL に落ちられない
+
 ## 規約
 
 - Deno ファースト(Web API 優先、Node.js API は必要最小限)

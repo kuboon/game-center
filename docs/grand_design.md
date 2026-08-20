@@ -109,7 +109,11 @@ score のない再報告は何もしない。
 https://example.github.io/my-puzzle/#gctoken=<JWT>
 ```
 
-起動トークンは game-center が署名する短命(2時間程度)の JWT で、claims は `sub`(ユーザ ID)、`aud`(game_id)、`exp` のみとする。
+起動トークンは game-center が署名する短命(2時間)の JWT で、claims は `sub`(ユーザ ID)、`aud`(game_id)、`iss`、`exp` のみとする。
+署名鍵は `RP_SIGNING_KEY_JWK`(ES256 の private JWK)で与える。
+未設定なら起動トークンは発行も検証もせず 503 を返す。
+isolate ごとに鍵を生成すると、発行した isolate 以外では検証が通らないためである。
+鍵の生成は `deno task keygen` で行う。
 フラグメントで渡すのは、ホスティング側のアクセスログに残さないためである。
 SDK はフラグメントからトークンを読み取って保存し、URL から除去したうえで REST モードに使う。
 
@@ -277,6 +281,7 @@ CORS ヘッダを返さないため、他オリジンのページからは呼べ
 | `POST /api/internal/session` | IdP の jws を検証して userId をセッションに確定 |
 | `GET /api/internal/me/achievements` | 全ゲーム横断の自分の実績一覧 |
 | `POST /api/internal/claim` | claim ページの確認ボタンから実績解除 |
+| `POST /api/internal/launch` | 起動トークンを発行し、フラグメント付きの起動 URL を返す |
 | `GET`/`POST` `/api/internal/games` | 自分のゲームの一覧と、マニフェストの登録・編集(Web UI 用) |
 | `GET`/`POST` `/api/internal/tokens` | 登録用 API トークンの一覧と発行 |
 | `DELETE /api/internal/tokens/{id}` | API トークンの失効 |

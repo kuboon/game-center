@@ -11,6 +11,7 @@ export interface Env {
   readonly TURSO_AUTH_TOKEN?: string;
   readonly IDP_ORIGIN?: string;
   readonly RP_ORIGIN?: string;
+  readonly RP_SIGNING_KEY_JWK?: string;
 }
 
 export interface Config {
@@ -22,6 +23,13 @@ export interface Config {
   readonly idpOrigin: string;
   /** This hub's own origin, used as the OAuth-style `clientId` at the IdP. */
   readonly rpOrigin: string;
+  /**
+   * Private JWK (JSON) this hub signs launch tokens with. Empty when unset,
+   * which turns launching off rather than falling back to a per-isolate key:
+   * Deno Deploy runs an isolate per request, so an ephemeral key would sign
+   * tokens no other isolate could verify.
+   */
+  readonly rpSigningKeyJwk: string;
 }
 
 /** Build a {@link Config} from the given environment. */
@@ -31,6 +39,7 @@ export function readConfig(env: Env): Config {
     tursoAuthToken: env.TURSO_AUTH_TOKEN ?? "",
     idpOrigin: env.IDP_ORIGIN ?? "https://id.kbn.one",
     rpOrigin: env.RP_ORIGIN ?? "https://ga-cen.kbn.one",
+    rpSigningKeyJwk: env.RP_SIGNING_KEY_JWK ?? "",
   };
 }
 
@@ -40,6 +49,7 @@ const ENV_KEYS = [
   "TURSO_AUTH_TOKEN",
   "IDP_ORIGIN",
   "RP_ORIGIN",
+  "RP_SIGNING_KEY_JWK",
 ] as const;
 
 let cached: Config | undefined;

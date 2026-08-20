@@ -3,22 +3,29 @@
  *
  * `/api/internal` is the hub's own frontend: a DPoP-proofed request whose
  * session carries the IdP userId. `/api/registry/v1` is CI and other servers:
- * a bearer token that acts as the player who issued it. Both end up at the
- * same {@link User}, and both fail with a response rather than an exception so
- * a controller can return it unchanged.
+ * a bearer token that acts as the player who issued it. `/api/game/v1` is a
+ * registered game: a launch token that names both the player and the one game
+ * it may act on. All three end up at a {@link User}, and all three fail with a
+ * response rather than an exception so a controller can return it unchanged.
  */
 
 import type { RequestContext } from "@remix-run/fetch-router";
 
 import { getDb } from "../db/client.ts";
 import { authenticateToken } from "../db/api_tokens.ts";
-import { findUserByExternalId, type User } from "../db/users.ts";
+import { findUserByExternalId, findUserById, type User } from "../db/users.ts";
 import {
   DpopProofError,
   DpopSession,
   SESSION_USER_ID,
 } from "../middleware/dpop.ts";
 import { apiError } from "../utils/api.ts";
+import {
+  type Launch,
+  LaunchTokenError,
+  SigningKeyMissingError,
+  verifyLaunchToken,
+} from "./launch_token.ts";
 
 export type Authentication =
   | { readonly ok: true; readonly user: User }
@@ -71,9 +78,8 @@ export async function authenticateSession(
 export async function authenticateApiToken(
   request: Request,
 ): Promise<Authentication> {
-  const header = request.headers.get("authorization") ?? "";
-  const match = /^Bearer\s+(\S+)$/i.exec(header);
-  if (!match) {
+  const token = bearerToken(request);
+  if (!token) {
     return {
       ok: false,
       response: apiError("Authorization: Bearer <token> required", 401),
@@ -83,9 +89,66 @@ export async function authenticateApiToken(
   const client = getDb();
   if (!client) return { ok: false, response: noDatabase() };
 
-  const user = await authenticateToken(client, match[1]);
+  const user = await authenticateToken(client, token);
   if (!user) return { ok: false, response: apiError("Unknown token", 401) };
   return { ok: true, user };
+}
+
+/** A verified launch token, plus the player it names. */
+export type GameAuthentication =
+  | { readonly ok: true; readonly user: User; readonly launch: Launch }
+  | { readonly ok: false; readonly response: Response };
+
+/**
+ * The player and game behind a request on the game-facing API.
+ *
+ * @param request The incoming request, for its Authorization header
+ * @returns The player and the game the token is scoped to, or the refusal
+ */
+export async function authenticateLaunch(
+  request: Request,
+): Promise<GameAuthentication> {
+  const token = bearerToken(request);
+  if (!token) {
+    return {
+      ok: false,
+      response: apiError("Authorization: Bearer <launch token> required", 401),
+    };
+  }
+
+  let launch: Launch;
+  try {
+    launch = await verifyLaunchToken(token);
+  } catch (error) {
+    if (error instanceof LaunchTokenError) {
+      // The game is expected to fall back to the claim URL on a 401, so the
+      // reason matters more than usual here.
+      return { ok: false, response: apiError(error.message, 401) };
+    }
+    if (error instanceof SigningKeyMissingError) {
+      return { ok: false, response: apiError(error.message, 503) };
+    }
+    throw error;
+  }
+
+  const client = getDb();
+  if (!client) return { ok: false, response: noDatabase() };
+
+  const user = await findUserById(client, launch.userId);
+  if (!user) {
+    return {
+      ok: false,
+      response: apiError("Launch token names no player", 401),
+    };
+  }
+  return { ok: true, user, launch };
+}
+
+function bearerToken(request: Request): string | null {
+  const match = /^Bearer\s+(\S+)$/i.exec(
+    request.headers.get("authorization") ?? "",
+  );
+  return match ? match[1] : null;
 }
 
 function noDatabase(): Response {
