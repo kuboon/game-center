@@ -121,3 +121,94 @@ Deno.test("the registry API refuses a malformed Authorization header", async () 
   );
   assertEquals(response.status, 401);
 });
+
+Deno.test("GET / serves the catalog with nothing in it", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/", { headers: { "rmx-frame": "1" } }),
+  );
+  const html = await response.text();
+  // No database in the unit tests, so the catalog is empty rather than broken.
+  assertStringIncludes(html, "まだゲームがありません");
+});
+
+Deno.test("GET /games/{id} says so when the game is unknown", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/games/nope", {
+      headers: { "rmx-frame": "1" },
+    }),
+  );
+  assertEquals(response.status, 200);
+  assertStringIncludes(await response.text(), "ゲームが見つかりません");
+});
+
+Deno.test("GET /claim/... says so when the achievement is unknown", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/claim/nope/first_clear", {
+      headers: { "rmx-frame": "1" },
+    }),
+  );
+  assertEquals(response.status, 200);
+  assertStringIncludes(await response.text(), "この実績は見つかりません");
+});
+
+Deno.test("the game API refuses a request with no launch token", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/game/v1/me"),
+  );
+  assertEquals(response.status, 401);
+  assertStringIncludes((await response.json()).error, "launch token");
+});
+
+Deno.test("the game API says it cannot check tokens with no signing key", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/game/v1/unlock", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer not.a.token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ achievement: "first_clear" }),
+    }),
+  );
+  // No signing key configured in the unit tests, so the hub says it cannot
+  // check rather than pretending the token is merely wrong.
+  assertEquals(response.status, 503);
+});
+
+Deno.test("the game API answers a preflight from any origin", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/game/v1/unlock", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://example.github.io",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization",
+      },
+    }),
+  );
+  assertEquals(response.status, 204);
+  assertEquals(response.headers.get("access-control-allow-origin"), "*");
+  assertStringIncludes(
+    response.headers.get("access-control-allow-headers") ?? "",
+    "authorization",
+  );
+});
+
+Deno.test("the game API's errors are readable cross-origin too", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/game/v1/achievements"),
+  );
+  assertEquals(response.status, 401);
+  // Without this a game cannot read its own 401 and know to fall back.
+  assertEquals(response.headers.get("access-control-allow-origin"), "*");
+});
+
+Deno.test("the internal API keeps CORS off, even next to the game API", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/internal/me/achievements", {
+      headers: { origin: "https://example.github.io" },
+    }),
+  );
+  assertEquals(response.status, 401);
+  assertEquals(response.headers.get("access-control-allow-origin"), null);
+});

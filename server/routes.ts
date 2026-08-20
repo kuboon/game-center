@@ -13,6 +13,8 @@ import { del, get, post, route } from "@remix-run/fetch-router/routes";
 
 export const routes = route({
   home: get("/"),
+  game: get("/games/:id"),
+  claim: get("/claim/:gameId/:key"),
   me: get("/me"),
   dev: get("/dev"),
   schema: get("/schema/gamecenter.json"),
@@ -23,6 +25,13 @@ export const routes = route({
   internalTokens: get("/api/internal/tokens"),
   internalTokensCreate: post("/api/internal/tokens"),
   internalTokensDelete: del("/api/internal/tokens/:id"),
+  internalLaunch: post("/api/internal/launch"),
+  internalClaim: post("/api/internal/claim"),
+  internalMeAchievements: get("/api/internal/me/achievements"),
+
+  gameUnlock: post("/api/game/v1/unlock"),
+  gameMe: get("/api/game/v1/me"),
+  gameAchievements: get("/api/game/v1/achievements"),
 
   registryGames: post("/api/registry/v1/games"),
 });

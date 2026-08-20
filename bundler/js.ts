@@ -10,6 +10,9 @@ const CLIENT_ENTRIES = [
   "nav_auth.tsx",
   "account_card.tsx",
   "dev_console.tsx",
+  "play_button.tsx",
+  "claim_panel.tsx",
+  "achievement_list.tsx",
 ] as const;
 
 export async function buildJs(

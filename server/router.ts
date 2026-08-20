@@ -19,12 +19,25 @@ import {
   internalTokensDeleteAction,
 } from "./controllers/api/internal_tokens.ts";
 import { registryGamesAction } from "./controllers/api/registry_games.ts";
+import {
+  gameAchievementsAction,
+  gameMeAction,
+  gameUnlockAction,
+} from "./controllers/api/game.ts";
+import { internalMeAchievementsAction } from "./controllers/api/internal_me.ts";
+import {
+  internalClaimAction,
+  internalLaunchAction,
+} from "./controllers/api/internal_play.ts";
 import { internalSessionAction } from "./controllers/api/session.ts";
+import { claimPageAction } from "./controllers/claim.tsx";
 import { devAction } from "./controllers/dev.tsx";
+import { gamePageAction } from "./controllers/game.tsx";
 import { homeAction } from "./controllers/home.tsx";
 import { meAction } from "./controllers/me.tsx";
 import { schemaAction } from "./controllers/schema.ts";
 import { dpop } from "./middleware/dpop.ts";
+import { gameCors } from "./middleware/game_cors.ts";
 import { routes } from "./routes.ts";
 
 /**
@@ -38,9 +51,11 @@ const serveBundled = staticFiles(
   new URL("../bundled", import.meta.url).pathname,
 ) as unknown as Middleware;
 
-const router = createRouter({ middleware: [serveBundled, dpop] });
+const router = createRouter({ middleware: [serveBundled, gameCors, dpop] });
 
 router.get(routes.home, homeAction);
+router.get(routes.game, gamePageAction);
+router.get(routes.claim, claimPageAction);
 router.get(routes.me, meAction);
 router.get(routes.dev, devAction);
 router.get(routes.schema, schemaAction);
@@ -51,6 +66,13 @@ router.post(routes.internalGamesRegister, internalGamesRegisterAction);
 router.get(routes.internalTokens, internalTokensAction);
 router.post(routes.internalTokensCreate, internalTokensCreateAction);
 router.delete(routes.internalTokensDelete, internalTokensDeleteAction);
+router.post(routes.internalLaunch, internalLaunchAction);
+router.post(routes.internalClaim, internalClaimAction);
+router.get(routes.internalMeAchievements, internalMeAchievementsAction);
+
+router.post(routes.gameUnlock, gameUnlockAction);
+router.get(routes.gameMe, gameMeAction);
+router.get(routes.gameAchievements, gameAchievementsAction);
 
 router.post(routes.registryGames, registryGamesAction);
 

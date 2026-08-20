@@ -23,6 +23,17 @@ Deno.test("defaults the IdP and hub origins to production", () => {
   assertEquals(config.rpOrigin, "https://ga-cen.kbn.one");
 });
 
+Deno.test("has no signing key unless one is set", () => {
+  // Launching is off rather than falling back to a generated key: on Deno
+  // Deploy each isolate would generate its own and sign tokens no other
+  // isolate could verify.
+  assertEquals(readConfig({}).rpSigningKeyJwk, "");
+  assertEquals(
+    readConfig({ RP_SIGNING_KEY_JWK: '{"kty":"EC"}' }).rpSigningKeyJwk,
+    '{"kty":"EC"}',
+  );
+});
+
 Deno.test("lets the environment point at a local IdP", () => {
   const config = readConfig({
     IDP_ORIGIN: "http://localhost:8001",
