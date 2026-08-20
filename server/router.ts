@@ -12,7 +12,7 @@ import { staticFiles } from "@remix-run/static-middleware";
 import { internalSessionAction } from "./controllers/api/session.ts";
 import { homeAction } from "./controllers/home.tsx";
 import { meAction } from "./controllers/me.tsx";
-import { dpopSessionMiddleware } from "./middleware/dpop.ts";
+import { dpop } from "./middleware/dpop.ts";
 import { routes } from "./routes.ts";
 
 /**
@@ -26,17 +26,7 @@ const serveBundled = staticFiles(
   new URL("../bundled", import.meta.url).pathname,
 ) as unknown as Middleware;
 
-/**
- * DPoP sessions need somewhere to persist, so the middleware is only installed
- * when a database is configured. Without one the hub still serves pages; it
- * just never sees anyone as signed in.
- */
-const sessions = dpopSessionMiddleware();
-const middleware: Middleware[] = sessions
-  ? [serveBundled, sessions]
-  : [serveBundled];
-
-const router = createRouter({ middleware });
+const router = createRouter({ middleware: [serveBundled, dpop] });
 
 router.get(routes.home, homeAction);
 router.get(routes.me, meAction);

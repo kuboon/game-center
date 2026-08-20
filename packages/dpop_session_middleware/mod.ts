@@ -64,6 +64,23 @@ export class DpopSession extends Session {
   }
 }
 
+/**
+ * Why the DPoP proof on this request did not verify.
+ *
+ * Set as a context key whenever {@link DpopSession} is absent, so a handler can
+ * answer "why am I not signed in?" — `missing-dpop-header` when the browser
+ * sent none, `url-mismatch` when the proof was signed for a different URL than
+ * the server saw (a reverse proxy rewriting the request URL is the usual
+ * cause), `expired` when the clocks disagree, and so on.
+ */
+export class DpopProofError {
+  constructor(readonly reason: string) {}
+
+  toString(): string {
+    return this.reason;
+  }
+}
+
 /** Decides whether a proof's `jti` has been seen before. */
 export interface ReplayDetector {
   /** Return true when the `jti` is acceptable, false when it is a replay. */
@@ -100,6 +117,7 @@ export interface DpopSessionMiddlewareOptions {
 
 type SetDpopSessionContextTransform = readonly [
   { key: typeof DpopSession; value: DpopSession },
+  { key: typeof DpopProofError; value: DpopProofError },
 ];
 
 /**
@@ -126,8 +144,12 @@ export function dpopSession(
       verifyOptions,
     );
     // No or invalid proof: continue without a session rather than rejecting, so
-    // routes that do not need one still work.
-    if (!result.valid) return next();
+    // routes that do not need one still work. The reason rides along for the
+    // handlers that do need one.
+    if (!result.valid) {
+      context.set(DpopProofError, new DpopProofError(result.error));
+      return next();
+    }
 
     const thumbprint = await computeThumbprint(result.jwk);
     const stored = await sessionStorage.read(thumbprint);
