@@ -23,11 +23,7 @@ import {
   sessionsArePersistent,
 } from "../../middleware/dpop.ts";
 import type { routes } from "../../routes.ts";
-
-const noStore = (response: Response): Response => {
-  response.headers.set("cache-control", "no-store");
-  return response;
-};
+import { apiError, apiJson } from "../../utils/api.ts";
 
 export const internalSessionAction = {
   async handler(context) {
@@ -40,36 +36,23 @@ export const internalSessionAction = {
     if (!session) {
       const reason = context.get(DpopProofError)?.reason ??
         "missing-dpop-proof";
-      return noStore(
-        Response.json({
-          error: "DPoP proof required",
-          reason,
-        }, { status: 401 }),
-      );
+      return apiError("DPoP proof required", 401, { reason });
     }
 
     // Signing in writes a user row and a session that must outlive this
     // isolate. Saying so beats accepting the token and forgetting it.
     if (!sessionsArePersistent) {
-      return noStore(
-        Response.json({
-          error: "This deployment has no database configured",
-        }, { status: 503 }),
-      );
+      return apiError("This deployment has no database configured", 503);
     }
 
     let jws: unknown;
     try {
       ({ jws } = await context.request.json() as { jws?: unknown });
     } catch {
-      return noStore(
-        Response.json({ error: "Body must be JSON" }, { status: 400 }),
-      );
+      return apiError("Body must be JSON", 400);
     }
     if (typeof jws !== "string" || !jws) {
-      return noStore(
-        Response.json({ error: "jws is required" }, { status: 400 }),
-      );
+      return apiError("jws is required", 400);
     }
 
     let identity;
@@ -77,9 +60,7 @@ export const internalSessionAction = {
       identity = await verifyIdpToken(jws, session.thumbprint);
     } catch (error) {
       if (error instanceof IdpTokenError) {
-        return noStore(
-          Response.json({ error: error.message }, { status: 401 }),
-        );
+        return apiError(error.message, 401);
       }
       throw error;
     }
@@ -91,8 +72,9 @@ export const internalSessionAction = {
     );
     session.set(SESSION_USER_ID, identity.userId);
 
-    return noStore(
-      Response.json({ userId: user.externalId, displayName: user.displayName }),
-    );
+    return apiJson({
+      userId: user.externalId,
+      displayName: user.displayName,
+    });
   },
 } satisfies Action<typeof routes.internalSession>;

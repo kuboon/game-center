@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ga-cen.kbn.one/schema/gamecenter.json",
+  "title": "gamecenter.json",
+  "description": "A game and its achievements, as game-center registers them.",
+  "type": "object",
+  "required": ["id", "title", "url", "achievements"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Points editors at this schema."
+    },
+    "id": {
+      "type": "string",
+      "description": "Globally unique slug, claimed by whoever registers it first.",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Where the game is played. Also the origin checked in postMessage mode. https, or http for localhost."
+    },
+    "icon": {
+      "type": "string",
+      "format": "uri"
+    },
+    "achievements": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["key", "title"],
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Unique within the game. What unlock() names.",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,62}[a-z0-9]$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "points": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "hidden": {
+            "type": "boolean",
+            "default": false,
+            "description": "Hide the title and description until it is unlocked."
+          }
+        }
+      }
+    }
+  }
+}
