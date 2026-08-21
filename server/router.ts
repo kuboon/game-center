@@ -13,11 +13,6 @@ import {
   internalGamesAction,
   internalGamesRegisterAction,
 } from "./controllers/api/internal_games.ts";
-import {
-  internalTokensAction,
-  internalTokensCreateAction,
-  internalTokensDeleteAction,
-} from "./controllers/api/internal_tokens.ts";
 import { registryGamesAction } from "./controllers/api/registry_games.ts";
 import {
   gameAchievementsAction,
@@ -63,9 +58,6 @@ router.get(routes.schema, schemaAction);
 router.post(routes.internalSession, internalSessionAction);
 router.get(routes.internalGames, internalGamesAction);
 router.post(routes.internalGamesRegister, internalGamesRegisterAction);
-router.get(routes.internalTokens, internalTokensAction);
-router.post(routes.internalTokensCreate, internalTokensCreateAction);
-router.delete(routes.internalTokensDelete, internalTokensDeleteAction);
 router.post(routes.internalLaunch, internalLaunchAction);
 router.post(routes.internalClaim, internalClaimAction);
 router.get(routes.internalMeAchievements, internalMeAchievementsAction);

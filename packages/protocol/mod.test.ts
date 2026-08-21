@@ -1,6 +1,13 @@
 import { assert, assertEquals } from "@std/assert";
 
-import { formatIssues, parseManifest, type ParseResult } from "./mod.ts";
+import {
+  extractManifestScript,
+  formatIssues,
+  MANIFEST_SCRIPT_TYPE,
+  parseManifest,
+  parseManifestText,
+  type ParseResult,
+} from "./mod.ts";
 
 /** A manifest with everything filled in, as a base for the invalid cases. */
 const valid = () => ({
@@ -66,7 +73,20 @@ Deno.test("rejects anything that is not an object", () => {
 
 Deno.test("reports every missing required field at once", () => {
   const result = parseManifest({});
-  assertEquals(paths(result).sort(), ["achievements", "id", "title", "url"]);
+  assertEquals(paths(result).sort(), ["achievements", "id", "title"]);
+});
+
+Deno.test("accepts a manifest with no url, since its location is its url", () => {
+  const { url: _, ...withoutUrl } = valid();
+  const result = parseManifest(withoutUrl);
+  assert(result.ok, "url should be optional");
+  assertEquals(result.manifest.url, undefined);
+});
+
+Deno.test("leaves a relative icon alone, for the registry to resolve", () => {
+  const result = parseManifest({ ...valid(), icon: "icon.png" });
+  assert(result.ok);
+  assertEquals(result.manifest.iconUrl, "icon.png");
 });
 
 Deno.test("rejects a slug that would not survive a URL", () => {
@@ -150,6 +170,57 @@ Deno.test("formats issues one per line, with the field first", () => {
   const result = parseManifest({});
   assert(!result.ok);
   const text = formatIssues(result.issues);
-  assertEquals(text.split("\n").length, 4);
+  assertEquals(text.split("\n").length, 3);
   assert(text.includes("id: is required"), text);
+});
+
+Deno.test("reports broken JSON like any other mistake in the document", () => {
+  const result = parseManifestText("{ not json");
+  assert(!result.ok);
+  assertEquals(result.issues.length, 1);
+  assert(result.issues[0].message.startsWith("is not valid JSON"));
+});
+
+Deno.test("finds an embedded manifest among other scripts", () => {
+  const html = `<!doctype html><html><head>
+    <script src="/game.js"></script>
+    <script type="application/ld+json">{"@type":"WebSite"}</script>
+    <script type="${MANIFEST_SCRIPT_TYPE}">{"id":"my-puzzle"}</script>
+    </head><body></body></html>`;
+  assertEquals(extractManifestScript(html)?.trim(), '{"id":"my-puzzle"}');
+});
+
+Deno.test("reads the type attribute however it was written", () => {
+  for (
+    const tag of [
+      `<script type='${MANIFEST_SCRIPT_TYPE}'>`,
+      `<script  TYPE = "${MANIFEST_SCRIPT_TYPE}" >`,
+      `<script id="gc" type=${MANIFEST_SCRIPT_TYPE}>`,
+    ]
+  ) {
+    assertEquals(
+      extractManifestScript(`${tag}{"id":"x"}</script>`),
+      '{"id":"x"}',
+      tag,
+    );
+  }
+});
+
+Deno.test("finds nothing in a page that declares no manifest", () => {
+  assertEquals(extractManifestScript("<html><body>hi</body></html>"), null);
+  assertEquals(
+    extractManifestScript('<script type="application/json">{}</script>'),
+    null,
+  );
+  assertEquals(extractManifestScript('<script src="/game.js"></script>'), null);
+});
+
+Deno.test("ends the script where a browser would", () => {
+  // HTML forbids `</script` inside a script element, so a manifest that needs
+  // the sequence has to escape it — and stopping at the first one is what the
+  // browser does too.
+  const html =
+    `<script type="${MANIFEST_SCRIPT_TYPE}">{"title":"a<\\/script>b"}</script><p>after`;
+  const text = extractManifestScript(html);
+  assertEquals(text, '{"title":"a<\\/script>b"}');
 });

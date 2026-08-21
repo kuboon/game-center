@@ -2,11 +2,21 @@
  * The gamecenter.json manifest: the vocabulary the hub, the GitHub Action, and
  * the SDK all share.
  *
- * A game declares itself and its achievements in one file, and every path into
- * the registry — the CI action, the developer dashboard — validates it through
- * {@link parseManifest} rather than trusting its own idea of the shape. The
- * errors are written for the person (or LLM) editing the file: they name the
- * field and say what was wrong with it.
+ * A game declares itself and its achievements in one document, and every path
+ * into the registry — the hub fetching a game's page, the developer dashboard —
+ * validates it through {@link parseManifest} rather than trusting its own idea
+ * of the shape. The errors are written for the person (or LLM) editing the
+ * document: they name the field and say what was wrong with it.
+ *
+ * The document lives in one of three places, and the hub looks for them in
+ * this order (see {@link MANIFEST_SCRIPT_TYPE} and {@link MANIFEST_FILENAME}):
+ *
+ * 1. Embedded in the game's own page, in a `<script>` tag the browser ignores.
+ *    This is the shape a single-file game wants: the manifest ships with the
+ *    code that implements the achievements, so neither can go stale alone.
+ * 2. A `gamecenter.json` file beside the page, for games that would rather keep
+ *    their HTML clean.
+ * 3. Pasted into the hub's dashboard, for games with no public URL to fetch.
  *
  * The JSON Schema next door (`schema.json`) describes the same document for
  * editors, and is served from the hub so `$schema` resolves.
@@ -28,12 +38,20 @@ export interface AchievementManifest {
 
 /** A game as its manifest declares it. */
 export interface GameManifest {
-  /** Globally unique slug, claimed by whoever registers it first. */
+  /** Globally unique slug, claimed by the first URL or account to register it. */
   readonly id: string;
   readonly title: string;
   readonly description?: string;
-  /** Where the game is played. Also the origin checked in postMessage mode. */
-  readonly url: string;
+  /**
+   * Where the game is played.
+   *
+   * Optional, because a manifest the hub fetched is already at the game's own
+   * URL — declaring it again could only introduce a disagreement. Required
+   * only when the manifest arrives with no location of its own, i.e. pasted
+   * into the dashboard.
+   */
+  readonly url?: string;
+  /** May be relative; the registry resolves it against the game's URL. */
   readonly iconUrl?: string;
   readonly achievements: readonly AchievementManifest[];
 }
@@ -48,6 +66,18 @@ export interface ManifestIssue {
 export type ParseResult =
   | { readonly ok: true; readonly manifest: GameManifest }
   | { readonly ok: false; readonly issues: readonly ManifestIssue[] };
+
+/**
+ * The `type` of the `<script>` tag an embedded manifest lives in.
+ *
+ * A type the browser does not recognise, so the tag is inert: the game's own
+ * JavaScript never sees it and never has to skip it. The same trick JSON-LD
+ * uses with `application/ld+json`.
+ */
+export const MANIFEST_SCRIPT_TYPE = "application/gamecenter+json";
+
+/** The conventional filename, looked for beside the game's page. */
+export const MANIFEST_FILENAME = "gamecenter.json";
 
 /** Slugs are lowercase so a game's URL never depends on how it was typed. */
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
@@ -96,13 +126,14 @@ export function parseManifest(value: unknown): ParseResult {
     add("description", `must be at most ${MAX_DESCRIPTION} characters`);
   }
 
-  const url = requireString(value.url, "url", add);
+  const url = optionalString(value.url, "url", add);
   if (url !== undefined) requireHttpsUrl(url, "url", add);
 
-  // `icon` in the file, `iconUrl` in code: the manifest reads better short,
-  // and the field is a URL like any other.
+  // `icon` in the document, `iconUrl` in code: the manifest reads better
+  // short, and the field is a URL like any other. Left as written — it may be
+  // relative to wherever the manifest was found, which only the registry
+  // knows.
   const iconUrl = optionalString(value.icon, "icon", add);
-  if (iconUrl !== undefined) requireHttpsUrl(iconUrl, "icon", add);
 
   const achievements = parseAchievements(value.achievements, add);
 
@@ -114,7 +145,7 @@ export function parseManifest(value: unknown): ParseResult {
       id: id!,
       title: title!,
       ...(description !== undefined ? { description } : {}),
-      url: url!,
+      ...(url !== undefined ? { url } : {}),
       ...(iconUrl !== undefined ? { iconUrl } : {}),
       achievements: achievements!,
     },
@@ -275,4 +306,66 @@ export function formatIssues(issues: readonly ManifestIssue[]): string {
   return issues
     .map(({ path, message }) => (path ? `${path}: ${message}` : message))
     .join("\n");
+}
+
+/**
+ * Pull an embedded manifest out of a game's HTML.
+ *
+ * Deliberately not a full HTML parse: the hub fetches pages written by
+ * strangers, and the only thing it needs from them is the contents of one
+ * script tag. The scan matches what a browser does — a script element ends at
+ * the first `</script`, because HTML forbids that sequence anywhere inside it
+ * and authors have to write `<\/script` instead. So truncating there is
+ * correct rather than a shortcut.
+ *
+ * @param html The page source
+ * @returns The script's text, or null when the page carries no manifest
+ */
+export function extractManifestScript(html: string): string | null {
+  let from = 0;
+  while (true) {
+    const start = html.toLowerCase().indexOf("<script", from);
+    if (start === -1) return null;
+
+    const tagEnd = html.indexOf(">", start);
+    if (tagEnd === -1) return null;
+
+    // The tag's attributes, lowercased for matching. Quotes may be single,
+    // double, or absent, and `type` may sit anywhere among them.
+    const tag = html.slice(start + "<script".length, tagEnd).toLowerCase();
+    const type = /type\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/.exec(tag);
+    const declared = (type?.[2] ?? type?.[3] ?? type?.[4] ?? "").trim();
+
+    if (declared === MANIFEST_SCRIPT_TYPE) {
+      const close = html.toLowerCase().indexOf("</script", tagEnd + 1);
+      return html.slice(tagEnd + 1, close === -1 ? undefined : close);
+    }
+
+    from = tagEnd + 1;
+  }
+}
+
+/**
+ * Parse a manifest that arrived as text, from a file or a script tag.
+ *
+ * Bad JSON is reported the same way a bad field is, because to whoever is
+ * editing the document it is the same kind of mistake.
+ *
+ * @param text The raw document
+ * @returns The manifest, or the list of problems with it
+ */
+export function parseManifestText(text: string): ParseResult {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (cause) {
+    return {
+      ok: false,
+      issues: [{
+        path: "",
+        message: `is not valid JSON: ${(cause as Error).message}`,
+      }],
+    };
+  }
+  return parseManifest(value);
 }

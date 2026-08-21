@@ -2,9 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ga-cen.kbn.one/schema/gamecenter.json",
   "title": "gamecenter.json",
-  "description": "A game and its achievements, as game-center registers them.",
+  "description": "A game and its achievements, as game-center registers them. Embed it in the game's page inside <script type=\"application/gamecenter+json\">, or serve it as gamecenter.json beside the page.",
   "type": "object",
-  "required": ["id", "title", "url", "achievements"],
+  "required": [
+    "id",
+    "title",
+    "achievements"
+  ],
   "additionalProperties": false,
   "properties": {
     "$schema": {
@@ -28,18 +32,22 @@
     "url": {
       "type": "string",
       "format": "uri",
-      "description": "Where the game is played. Also the origin checked in postMessage mode. https, or http for localhost."
+      "description": "Where the game is played. Optional: a manifest the hub fetched is already at the game's URL. Required only when the manifest is pasted into the dashboard. https, or http for localhost."
     },
     "icon": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "description": "Icon URL. May be relative to the manifest's location."
     },
     "achievements": {
       "type": "array",
       "maxItems": 200,
       "items": {
         "type": "object",
-        "required": ["key", "title"],
+        "required": [
+          "key",
+          "title"
+        ],
         "additionalProperties": false,
         "properties": {
           "key": {

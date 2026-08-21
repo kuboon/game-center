@@ -1,28 +1,35 @@
 /**
- * POST /api/registry/v1/games — register a game from CI.
+ * POST /api/registry/v1/games — register the game published at a URL.
  *
- * This is the surface the GitHub Action posts `gamecenter.json` to. It carries
- * an API token rather than a DPoP proof, because there is no browser and no
- * key in the runner, and it sends no CORS headers: a token belongs in a
- * secret store, never in a page.
+ * Unauthenticated on purpose. The only thing this endpoint does is make the
+ * hub re-read a document that its author already chose to publish, and the
+ * document's location is what decides whether it may write. There is nothing a
+ * credential would add, and the credential is the step a game's author cannot
+ * automate.
+ *
+ * Which is why the GitHub Action is a bare POST with no secret in it.
  */
 
 import type { Action } from "@remix-run/fetch-router";
 
 import { requireDb } from "../../db/client.ts";
-import { authenticateApiToken } from "../../lib/auth.ts";
-import { registerFromRequest } from "../../lib/game_registration.ts";
+import { registerFromUrl } from "../../lib/game_registration.ts";
 import type { routes } from "../../routes.ts";
+import { apiError } from "../../utils/api.ts";
 
 export const registryGamesAction = {
   async handler(context) {
-    const auth = await authenticateApiToken(context.request);
-    if (!auth.ok) return auth.response;
+    let url: unknown;
+    try {
+      ({ url } = await context.request.json() as { url?: unknown });
+    } catch {
+      return apiError("Body must be JSON", 400);
+    }
+    if (typeof url !== "string" || !url) {
+      return apiError("url is required", 400);
+    }
 
-    return await registerFromRequest(
-      requireDb(),
-      auth.user.id,
-      context.request,
-    );
+    const client = requireDb();
+    return await registerFromUrl(client, url);
   },
 } satisfies Action<typeof routes.registryGames>;

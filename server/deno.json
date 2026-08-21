@@ -37,12 +37,7 @@
         "TURSO_DATABASE_URL",
         "TURSO_AUTH_TOKEN"
       ],
-      "net": [
-        "id.kbn.one",
-        "*.turso.io",
-        "localhost",
-        "127.0.0.1"
-      ],
+      "net": true,
       "read": [
         "../bundled"
       ]

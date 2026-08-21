@@ -20,10 +20,12 @@ import {
 import { upsertUser } from "../server/db/users.ts";
 import { type Client, migratedDb } from "./support/db.ts";
 
+const GAME_URL = "https://example.github.io/my-puzzle/";
+const MANIFEST_URL = "https://example.github.io/my-puzzle/gamecenter.json";
+
 const manifest: GameManifest = {
   id: "my-puzzle",
   title: "My Puzzle",
-  url: "https://example.github.io/my-puzzle/",
   achievements: [
     {
       key: "first_clear",
@@ -37,11 +39,13 @@ const manifest: GameManifest = {
 
 /** A player and one registered game, the starting point for every test here. */
 async function playable(client: Client) {
-  const owner = await upsertUser(client, "idp-owner", "owner");
   const player = await upsertUser(client, "idp-player", "player");
-  await registerGame(client, owner.id, manifest);
+  await register(client, manifest);
   return player;
 }
+
+const register = (client: Client, m: GameManifest) =>
+  registerGame(client, { manifestUrl: MANIFEST_URL }, m, GAME_URL);
 
 Deno.test("records an unlock the first time", async () => {
   await migratedDb(async (client) => {
@@ -153,8 +157,7 @@ Deno.test("refuses an achievement the game never declared", async () => {
 Deno.test("refuses an achievement the manifest retired", async () => {
   await migratedDb(async (client) => {
     const player = await playable(client);
-    const owner = await upsertUser(client, "idp-owner", "owner");
-    await registerGame(client, owner.id, {
+    await register(client, {
       ...manifest,
       achievements: [manifest.achievements[0]],
     });
@@ -177,8 +180,7 @@ Deno.test("keeps an unlock the manifest later retired", async () => {
       score: 1200,
     });
 
-    const owner = await upsertUser(client, "idp-owner", "owner");
-    await registerGame(client, owner.id, {
+    await register(client, {
       ...manifest,
       achievements: [manifest.achievements[0]],
     });
