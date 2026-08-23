@@ -308,19 +308,24 @@ export const DevConsole = clientEntry(
             )
             : null}
 
-          {myHandle ? null : (
-            <div class="alert alert-warning">
-              <div>
-                <p>
-                  まだハンドルを決めていません。 ゲームは作者を必要とするので、
-                  登録の前に{" "}
-                  <a class="link" href="/me" rmx-target="content">マイページ</a>
-                  {" "}
-                  でハンドルを決めてください。
-                </p>
+          {myHandle
+            ? (
+              <div class="alert">
+                <div>
+                  <p>
+                    あなたの作者 ID は <code class="break-all">{myHandle}</code>
+                    {" "}
+                    です。マニフェストの <code>author</code>{" "}
+                    にこれを書きます。 AI に渡す手順一式は{" "}
+                    <a class="link" href="/me" rmx-target="content">
+                      マイページ
+                    </a>{" "}
+                    からコピーできます。
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )
+            : null}
 
           {pending.length === 0
             ? null

@@ -26,7 +26,7 @@ import {
   withDb,
 } from "./support/db.ts";
 
-const LATEST_MIGRATION = "20260821120000";
+const LATEST_MIGRATION = "20260823000000";
 
 Deno.test("migrate creates every table the design declares", async () => {
   await migratedDb(async (client) => {
@@ -72,6 +72,9 @@ Deno.test("migrate is a no-op once applied", async () => {
 Deno.test("rollback reverts one migration at a time", async () => {
   await withDb(async (url, client) => {
     assertOk(await runDb(url, "migrate"), "migrate");
+
+    // Undo the IdP-derived handles: nobody has one again.
+    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback handles");
 
     // Undo author-scoped ids: the slug column goes.
     assertOk(

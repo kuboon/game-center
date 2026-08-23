@@ -23,7 +23,6 @@ export const routes = route({
   internalSession: post("/api/internal/session"),
   internalGames: get("/api/internal/games"),
   internalGamesRegister: post("/api/internal/games"),
-  internalHandle: post("/api/internal/handle"),
   internalApprove: post("/api/internal/registrations/:id"),
   internalDismiss: del("/api/internal/registrations/:id"),
   internalLaunch: post("/api/internal/launch"),

@@ -19,7 +19,7 @@ import {
   submitRegistration,
   TooManyPendingError,
 } from "../server/db/registrations.ts";
-import { claimHandle, upsertUser } from "../server/db/users.ts";
+import { upsertUser } from "../server/db/users.ts";
 import { approveRegistration } from "../server/lib/game_registration.ts";
 import { type Client, migratedDb } from "./support/db.ts";
 
@@ -41,14 +41,10 @@ const manifest = (overrides: Partial<GameManifest> = {}): GameManifest => ({
   ...overrides,
 });
 
-/** An author with a handle, ready to be named by a manifest. */
-async function author(
-  client: Client,
-  externalId = "idp-author",
-  handle = "kuboon",
-) {
-  const user = await upsertUser(client, externalId, externalId);
-  return await claimHandle(client, user.id, handle);
+/** An author, ready to be named by a manifest. Its handle is its IdP id. */
+async function author(client: Client, handle = "kuboon") {
+  const user = await upsertUser(client, handle, handle);
+  return { ...user, handle };
 }
 
 const submit = (
@@ -103,7 +99,7 @@ Deno.test("a pending submission holds no slug, so one author can race themselves
 Deno.test("another author submitting the same slug collides with nobody", async () => {
   await migratedDb(async (client) => {
     const kuboon = await author(client);
-    const other = await author(client, "idp-other", "someone-else");
+    const other = await author(client, "someone-else");
 
     await submit(client, kuboon.id);
     await submit(client, other.id, {
@@ -156,7 +152,7 @@ Deno.test("re-submitting one URL replaces what is waiting", async () => {
 Deno.test("keeps one author's queue out of another's", async () => {
   await migratedDb(async (client) => {
     const kuboon = await author(client);
-    const other = await author(client, "idp-other", "someone-else");
+    const other = await author(client, "someone-else");
     const pending = await submit(client, kuboon.id);
 
     assertEquals(await listPending(client, other.id), []);

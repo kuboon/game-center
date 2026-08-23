@@ -15,7 +15,6 @@ import {
   internalGamesAction,
   internalGamesRegisterAction,
 } from "./controllers/api/internal_games.ts";
-import { internalHandleAction } from "./controllers/api/internal_handle.ts";
 import { registryGamesAction } from "./controllers/api/registry_games.ts";
 import {
   gameAchievementsAction,
@@ -63,7 +62,6 @@ router.get(routes.schema, schemaAction);
 router.post(routes.internalSession, internalSessionAction);
 router.get(routes.internalGames, internalGamesAction);
 router.post(routes.internalGamesRegister, internalGamesRegisterAction);
-router.post(routes.internalHandle, internalHandleAction);
 router.post(routes.internalApprove, internalApproveAction);
 router.delete(routes.internalDismiss, internalDismissAction);
 router.post(routes.internalLaunch, internalLaunchAction);

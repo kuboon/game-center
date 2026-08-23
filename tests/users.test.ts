@@ -5,13 +5,11 @@
  * local libSQL client, the same way `migrate.test.ts` does.
  */
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 
 import {
-  claimHandle,
   findUserByExternalId,
   findUserByHandle,
-  HandleError,
   upsertUser,
 } from "../server/db/users.ts";
 import { migratedDb } from "./support/db.ts";
@@ -57,43 +55,26 @@ Deno.test("finds nobody for an unknown id", async () => {
   });
 });
 
-Deno.test("gives a player the handle they ask for", async () => {
-  await migratedDb(async (client) => {
+Deno.test("hands a player the IdP's id as their handle", () => {
+  return migratedDb(async (client) => {
     const user = await upsertUser(client, "idp-user-1", "kuboon");
-    assertEquals(user.handle, null);
-
-    const named = await claimHandle(client, user.id, "Kuboon");
-    // Lowercased on the way in: it ends up in URLs and in manifests, where
-    // two spellings of one name would be two different authors.
-    assertEquals(named.handle, "kuboon");
-    assertEquals(
-      (await findUserByHandle(client, "kuboon"))?.id,
-      user.id,
-    );
+    // Nothing to choose: the id they already sign in with is unique, stable,
+    // and theirs, so they can publish without deciding anything first.
+    assertEquals(user.handle, "idp-user-1");
+    assertEquals((await findUserByHandle(client, "idp-user-1"))?.id, user.id);
   });
 });
 
-Deno.test("a handle belongs to one player and is not changed", async () => {
-  await migratedDb(async (client) => {
-    const first = await upsertUser(client, "idp-user-1", "one");
-    const second = await upsertUser(client, "idp-user-2", "two");
-    await claimHandle(client, first.id, "kuboon");
-
-    await assertRejects(
-      () => claimHandle(client, second.id, "kuboon"),
-      HandleError,
-    );
-    // Not even by its owner: manifests naming the old one would break.
-    await assertRejects(
-      () => claimHandle(client, first.id, "someone-else"),
-      HandleError,
-    );
-    assertEquals(await findUserByHandle(client, "someone-else"), null);
+Deno.test("compares a handle verbatim, since its case is the IdP's", () => {
+  return migratedDb(async (client) => {
+    await upsertUser(client, "Vk9tZ3JlZW4", "mixed case");
+    assert(await findUserByHandle(client, "Vk9tZ3JlZW4"));
+    assertEquals(await findUserByHandle(client, "vk9tz3jlzw4"), null);
   });
 });
 
-Deno.test("finds nobody behind an unclaimed handle", async () => {
-  await migratedDb(async (client) => {
+Deno.test("finds nobody behind an unused handle", () => {
+  return migratedDb(async (client) => {
     assertEquals(await findUserByHandle(client, "nobody"), null);
   });
 });
