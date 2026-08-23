@@ -26,7 +26,7 @@ import {
   withDb,
 } from "./support/db.ts";
 
-const LATEST_MIGRATION = "20260821000000";
+const LATEST_MIGRATION = "20260821120000";
 
 Deno.test("migrate creates every table the design declares", async () => {
   await migratedDb(async (client) => {
@@ -72,6 +72,18 @@ Deno.test("migrate is a no-op once applied", async () => {
 Deno.test("rollback reverts one migration at a time", async () => {
   await withDb(async (url, client) => {
     assertOk(await runDb(url, "migrate"), "migrate");
+
+    // Undo author-scoped ids: the slug column goes.
+    assertOk(
+      await runDb(url, "rollback", "--step", "1"),
+      "rollback scoped ids",
+    );
+    const gameColumns = await client.execute("pragma table_info(games)");
+    assertEquals(
+      gameColumns.rows.some((row) => String(row.name) === "slug"),
+      false,
+      "games.slug survived rollback",
+    );
 
     // Undo authors: the approval queue and handles go.
     assertOk(await runDb(url, "rollback", "--step", "1"), "rollback authors");
