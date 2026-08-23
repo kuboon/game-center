@@ -55,7 +55,10 @@ export const authorPageAction = {
                 <li key={game.id} class="border-base-300 border-t pt-3">
                   <a
                     class="link link-hover font-bold"
-                    href={routes.game.href({ id: game.id })}
+                    href={routes.game.href({
+                      handle,
+                      slug: game.slug,
+                    })}
                     rmx-target="content"
                   >
                     {game.title}

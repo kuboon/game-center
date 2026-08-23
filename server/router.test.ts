@@ -164,9 +164,9 @@ Deno.test("GET / serves the catalog with nothing in it", async () => {
   assertStringIncludes(html, "まだゲームがありません");
 });
 
-Deno.test("GET /games/{id} says so when the game is unknown", async () => {
+Deno.test("GET /@{author}/{slug} says so when the game is unknown", async () => {
   const response = await router.fetch(
-    new Request("http://localhost/games/nope", {
+    new Request("http://localhost/@kuboon/nope", {
       headers: { "rmx-frame": "1" },
     }),
   );
@@ -176,7 +176,7 @@ Deno.test("GET /games/{id} says so when the game is unknown", async () => {
 
 Deno.test("GET /claim/... says so when the achievement is unknown", async () => {
   const response = await router.fetch(
-    new Request("http://localhost/claim/nope/first_clear", {
+    new Request("http://localhost/claim/@kuboon/nope/first_clear", {
       headers: { "rmx-frame": "1" },
     }),
   );

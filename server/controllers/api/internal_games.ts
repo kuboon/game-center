@@ -44,7 +44,7 @@ export const internalGamesAction = {
       games: withAchievements,
       pending: pending.map((entry) => ({
         id: entry.id,
-        gameId: entry.gameId,
+        slug: entry.slug,
         title: entry.manifest.title,
         manifestUrl: entry.manifestUrl,
         gameUrl: entry.gameUrl,
@@ -95,8 +95,16 @@ export const internalApproveAction = {
 
     const pending = await findPending(client, auth.user.id, id);
     if (!pending) return apiError("Unknown registration", 404);
+    if (!auth.user.handle) {
+      // Cannot happen: nothing reaches a queue without a handle to name it by.
+      return apiError("Choose a handle before approving anything", 409);
+    }
 
-    const response = await approveRegistration(client, auth.user, pending);
+    const response = await approveRegistration(
+      client,
+      { ...auth.user, handle: auth.user.handle },
+      pending,
+    );
     // Left in the queue when the slug turned out to be taken, so the author can
     // see why and dismiss it themselves.
     if (response.ok) await removePending(client, auth.user.id, id);

@@ -1,5 +1,5 @@
 /**
- * GET /games/{id} — one game, its achievements, and the way in.
+ * GET /@{author}/{slug} — one game, its achievements, and the way in.
  *
  * The achievement list is server-rendered from the manifest, so it reads the
  * same for a visitor as for a signed-in player. Hidden achievements are shown
@@ -11,22 +11,26 @@ import type { Action } from "@remix-run/fetch-router";
 
 import { PlayButton } from "../../client/play_button.tsx";
 import { getDb } from "../db/client.ts";
+import { gameRef } from "@game-center/protocol";
+
 import { type Achievement, findGame, listAchievements } from "../db/games.ts";
-import { findUserById } from "../db/users.ts";
+import { findUserByHandle } from "../db/users.ts";
 import { routes } from "../routes.ts";
 import { renderPage } from "../utils/render.tsx";
 
 export const gamePageAction = {
   async handler(context) {
+    const { handle, slug } = context.params;
+    const ref = gameRef(handle, slug);
     const client = getDb();
-    const game = client ? await findGame(client, context.params.id) : null;
+    const game = client ? await findGame(client, ref) : null;
     if (!client || !game) {
       return renderPage(
         context,
         <main class="mx-auto w-full max-w-3xl space-y-6 p-8">
           <h1 class="text-3xl font-bold">ゲームが見つかりません</h1>
           <p>
-            <code>{context.params.id}</code> は登録されていません。{" "}
+            <code>@{ref}</code> は登録されていません。{" "}
             <a class="link" href={routes.home.href()} rmx-target="content">
               カタログ
             </a>{" "}
@@ -38,7 +42,7 @@ export const gamePageAction = {
 
     const achievements = await listAchievements(client, game.id);
     const points = achievements.reduce((sum, a) => sum + a.points, 0);
-    const author = await findUserById(client, game.ownerId);
+    const author = await findUserByHandle(client, handle);
 
     return renderPage(
       context,

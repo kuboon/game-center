@@ -6,10 +6,11 @@
  * account says yes, which is the other half: the document claims the person,
  * and the person claims the document.
  *
- * A pending row deliberately does not hold the game id. Reserving it here would
- * make squatting trivial — park the good slugs behind approvals that never
- * arrive. The id is claimed at approval, and two submissions racing for one id
- * are settled by whoever approves first.
+ * A pending row holds a slug, not a game id, and nothing unique on it: it has
+ * claimed nothing. Reserving here would let anyone park an author's good names
+ * behind approvals that never arrive. The id is built and taken at approval,
+ * and two submissions racing for one slug are settled by whoever approves
+ * first.
  */
 
 import type { GameManifest } from "@game-center/protocol";
@@ -26,7 +27,8 @@ export class TooManyPendingError extends Error {
 
 export interface PendingRegistration {
   readonly id: number;
-  readonly gameId: string;
+  /** The slug the manifest asked for. Not yet qualified, not yet taken. */
+  readonly slug: string;
   readonly manifestUrl: string;
   readonly gameUrl: string;
   readonly authorId: number;
@@ -51,7 +53,7 @@ export async function submitRegistration(
   client: Client,
   authorId: number,
   entry: {
-    gameId: string;
+    slug: string;
     manifestUrl: string;
     gameUrl: string;
     manifest: GameManifest;
@@ -69,15 +71,15 @@ export async function submitRegistration(
 
   await client.execute({
     sql: `insert into game_registrations
-            (game_id, manifest_url, game_url, author_id, manifest)
+            (slug, manifest_url, game_url, author_id, manifest)
           values (?, ?, ?, ?, ?)
           on conflict (manifest_url, author_id) do update
-            set game_id = excluded.game_id,
+            set slug = excluded.slug,
                 game_url = excluded.game_url,
                 manifest = excluded.manifest,
                 submitted_at = datetime('now')`,
     args: [
-      entry.gameId,
+      entry.slug,
       entry.manifestUrl,
       entry.gameUrl,
       authorId,
@@ -161,13 +163,13 @@ async function countPending(
 }
 
 const COLUMNS =
-  `select id, game_id, manifest_url, game_url, author_id, manifest, submitted_at
+  `select id, slug, manifest_url, game_url, author_id, manifest, submitted_at
      from game_registrations`;
 
 function toPending(row: Record<string, unknown>): PendingRegistration {
   return {
     id: Number(row.id),
-    gameId: String(row.game_id),
+    slug: String(row.slug),
     manifestUrl: String(row.manifest_url),
     gameUrl: String(row.game_url),
     authorId: Number(row.author_id),

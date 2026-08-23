@@ -1,4 +1,4 @@
--- Back to ownership by URL or account, with no authors and no approval step.
+-- Back to globally unique ids owned by a URL or an account, with no authors.
 
 drop index if exists game_registrations_author_id;
 drop table game_registrations;
@@ -19,16 +19,11 @@ create table games_old (
   check ((owner_id is null) <> (manifest_url is null))
 );
 
--- The old shape allows only one of the two, so a game that has both keeps the
--- URL: that is what may write to it.
-insert into games_old
-  (id, owner_id, manifest_url, title, description, url, icon_url, status, created_at, updated_at)
-  select id,
-         case when manifest_url is null then owner_id end,
-         manifest_url,
-         title, description, url, icon_url, status, created_at, updated_at
-    from games;
-
+-- Unqualifying the ids can collide, since two authors may share a slug, and the
+-- old shape allows only one of owner or URL. Rather than guess which game keeps
+-- a name, this drops them all — the same trade the forward migration makes.
+delete from user_achievements;
+delete from achievements;
 drop table games;
 alter table games_old rename to games;
 

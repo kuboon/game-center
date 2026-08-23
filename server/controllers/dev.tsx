@@ -49,6 +49,12 @@ export const devAction = {
               片方だけ古くなることがありません。 <code>author</code>{" "}
               にはあなたのハンドルを書きます。
             </p>
+            <p class="text-sm opacity-70">
+              <code>id</code> はあなたのゲームの中で一意ならよく、全体では{" "}
+              <code>kuboon/my-puzzle</code>{" "}
+              という名前になります。他の作者と名前がぶつかることはないので、
+              空いているかどうかを気にする必要はありません。
+            </p>
             <pre class="bg-base-200 overflow-x-auto rounded-box p-4 text-sm"><code>{SNIPPET}</code></pre>
             <p>
               HTML に混ぜたくなければ、ページの隣に <code>gamecenter.json</code>

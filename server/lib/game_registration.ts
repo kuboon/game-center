@@ -15,6 +15,7 @@
 import {
   formatIssues,
   type GameManifest,
+  gameRef,
   type ManifestIssue,
   parseManifest,
 } from "@game-center/protocol";
@@ -31,7 +32,7 @@ import {
   submitRegistration,
   TooManyPendingError,
 } from "../db/registrations.ts";
-import { findUserByHandle, type User } from "../db/users.ts";
+import { findUserByHandle, type NamedUser, type User } from "../db/users.ts";
 import { apiError, apiJson } from "../utils/api.ts";
 import { fetchManifest, ManifestFetchError } from "./manifest_fetch.ts";
 
@@ -70,18 +71,26 @@ export async function registerFromUrl(
     );
   }
 
+  // `manifest.author` is the handle that found this account, so it is their
+  // handle — no need to reach for the nullable column.
+  const handle = fetched.manifest.author;
+
   // Already this author's game: updates flow straight through, which is what
   // lets CI push the same document on every commit.
   const known = await isKnownUrl(
     client,
-    fetched.manifest.id,
+    gameRef(handle, fetched.manifest.id),
     fetched.manifestUrl,
   );
 
   if (known || submitter?.id === author.id) {
     return await store(
       client,
-      { ownerId: author.id, manifestUrl: fetched.manifestUrl },
+      {
+        ownerId: author.id,
+        authorHandle: handle,
+        manifestUrl: fetched.manifestUrl,
+      },
       fetched.manifest,
       fetched.gameUrl,
       { source: fetched.source, manifestUrl: fetched.manifestUrl },
@@ -91,7 +100,7 @@ export async function registerFromUrl(
   let pending: PendingRegistration;
   try {
     pending = await submitRegistration(client, author.id, {
-      gameId: fetched.manifest.id,
+      slug: fetched.manifest.id,
       manifestUrl: fetched.manifestUrl,
       gameUrl: fetched.gameUrl,
       manifest: fetched.manifest,
@@ -106,7 +115,7 @@ export async function registerFromUrl(
   return apiJson({
     pending: true,
     author: author.handle,
-    game: { id: pending.gameId, title: pending.manifest.title },
+    game: { id: gameRef(handle, pending.slug), title: pending.manifest.title },
     manifestUrl: pending.manifestUrl,
     message:
       `Waiting for @${author.handle} to approve this URL on their game-center dashboard. Nothing is registered until they do.`,
@@ -153,7 +162,7 @@ export async function registerFromPaste(
 
   return await store(
     client,
-    { ownerId: submitter.id },
+    { ownerId: submitter.id, authorHandle: submitter.handle },
     parsed.manifest,
     parsed.manifest.url,
     { source: "pasted" },
@@ -173,12 +182,16 @@ export async function registerFromPaste(
  */
 export function approveRegistration(
   client: Client,
-  author: User,
+  author: NamedUser,
   pending: PendingRegistration,
 ): Promise<Response> {
   return store(
     client,
-    { ownerId: author.id, manifestUrl: pending.manifestUrl },
+    {
+      ownerId: author.id,
+      authorHandle: author.handle,
+      manifestUrl: pending.manifestUrl,
+    },
     pending.manifest,
     pending.gameUrl,
     { source: "approved", manifestUrl: pending.manifestUrl },

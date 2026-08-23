@@ -82,7 +82,7 @@ SDK は利用可能なモードを自動選択する。
 ゲームは次の URL を新規タブで開くだけでよい。
 
 ```
-https://ga-cen.kbn.one/claim/{game_id}/{achievement_key}
+https://ga-cen.kbn.one/claim/@{author}/{slug}/{achievement_key}
 ```
 
 遷移先でプレイヤーは(未サインインなら)サインインし、「実績を解除する」を確認して解除が記録される。
@@ -109,7 +109,7 @@ score のない再報告は何もしない。
 https://example.github.io/my-puzzle/#gctoken=<JWT>
 ```
 
-起動トークンは game-center が署名する短命(2時間)の JWT で、claims は `sub`(ユーザ ID)、`aud`(game_id)、`iss`、`exp` のみとする。
+起動トークンは game-center が署名する短命(2時間)の JWT で、claims は `sub`(ユーザ ID)、`aud`(`{author}/{slug}`)、`iss`、`exp` のみとする。
 署名鍵は `RP_SIGNING_KEY_JWK`(ES256 の private JWK)で与える。
 未設定なら起動トークンは発行も検証もせず 503 を返す。
 isolate ごとに鍵を生成すると、発行した isolate 以外では検証が通らないためである。
@@ -129,7 +129,7 @@ SDK はフラグメントからトークンを読み取って保存し、URL か
 ```jsonc
 {
   "$schema": "https://ga-cen.kbn.one/schema/gamecenter.json",
-  "id": "my-puzzle",              // 全体で一意な slug。作者の承認時に確定する
+  "id": "my-puzzle",              // 作者の中で一意な slug。全体では kuboon/my-puzzle
   "author": "kuboon",             // 作者の game-center ハンドル
   "title": "My Puzzle",
   "description": "3分で遊べるパズル",
@@ -168,6 +168,27 @@ SDK はフラグメントからトークンを読み取って保存し、URL か
 実績を実装したコードとマニフェストが同じファイルに乗るので、片方だけ古くなるということが起きない。
 ビルドも配置手順もない環境に「隣にもう一枚置け」と要求するのは、一番制約の厳しい相手に一番余計な手間を課すことになる。
 
+### ゲームの名前は作者の中で一意
+
+ゲームの id は作者のハンドルで修飾する。
+`kuboon/my-puzzle` が全体での名前であり、マニフェストに書く `id` はその後半だけである。
+
+こうすると、名前の衝突が起きるのは自分のゲーム同士だけになる。
+他人に名前を取られることがないので、マニフェストを書く LLM が「この名前は空いているか」を気にする必要もない。
+二人の作者がどちらも `tetris` を持てる。
+
+URL もこの形になる。
+
+| パス | 役割 |
+|---|---|
+| `/@kuboon` | 作者ページ |
+| `/@kuboon/my-puzzle` | ゲーム詳細 |
+| `/claim/@kuboon/my-puzzle/first_clear` | claim URL |
+
+ハンドルを主キーの一部に含めるのは、**ハンドルを変更せず、ゲームを譲渡しない**ことを前提としているからである。
+どちらかを認めると、ゲームの中に埋め込まれた claim URL が指す先を失う。
+将来それが必要になったときは、旧 `@handle/slug` からのリダイレクトを持つことになる。
+
 ### 登録は二者の合意で成立する
 
 すべてのゲームは作者を持つ。
@@ -192,8 +213,9 @@ SDK はフラグメントからトークンを読み取って保存し、URL か
 CI が毎 push 叩けるという性質はここで保たれる。
 
 **保留中の投稿は slug を確保しない。**
-確保してしまうと、承認の来ない投稿で人気のありそうな id を占拠できてしまう。
-slug は承認の瞬間に取り、同じ id を狙う複数の投稿は先に承認した者が取る。
+確保してしまうと、承認の来ない投稿で作者の良い名前を占拠できてしまう。
+id は承認の瞬間に組み立てて取り、同じ slug を狙う複数の投稿は先に承認した者が取る。
+名前空間が作者ごとに閉じているので、ここで争うのは同じ作者宛の投稿同士だけである。
 
 承認は誤って押しうる行為でもある。
 攻撃者が自分のサイトに他人を作者と書いたマニフェストを置き、名指しされた人が中身を見ずに承認すると、その人の名義で攻撃者が内容を差し替えられるゲームができる。
@@ -382,9 +404,9 @@ Web UI 側の主なルートは次のとおり。
 | パス | 役割 |
 |---|---|
 | `/` | カタログ(ゲーム一覧) |
-| `/games/{id}` | ゲーム詳細。実績一覧と「遊ぶ」ボタン |
-| `/play/{id}` | iframe 埋め込みプレイページ(postMessage モードの親) |
-| `/claim/{game_id}/{key}` | claim URL の受け口。確認して解除 |
+| `/@{handle}/{slug}` | ゲーム詳細。実績一覧と「遊ぶ」ボタン |
+| `/play/{handle}/{slug}` | iframe 埋め込みプレイページ(postMessage モードの親) |
+| `/claim/@{handle}/{slug}/{key}` | claim URL の受け口。確認して解除 |
 | `/me` | 自分の実績一覧とポイント合計、ハンドルの設定 |
 | `/@{handle}` | 作者ページ。その作者のゲーム一覧 |
 | `/dev` | 開発者ダッシュボード(ゲーム登録、API トークン発行) |
@@ -401,7 +423,7 @@ GitHub Pages のゲームは JSR / esm.sh から import してもよい。
 ```ts
 import { GameCenter } from "@kuboon/game-center-sdk"; // またはファイル同梱
 
-const gc = GameCenter.init({ gameId: "my-puzzle" });
+const gc = GameCenter.init({ gameId: "kuboon/my-puzzle" });
 gc.unlock("first_clear");                  // モードを自動選択して解除
 gc.unlock("high_score", { score: 1200 });  // スコア付き。ハイスコアのみ保持
 gc.player;                  // { name } | null (起動トークンがある場合のみ)
@@ -508,5 +530,5 @@ M2 の実装手本は deno-remix-reference(RP 側)と id.kbn.one 本体(IdP 側)
 
 決着したもの。
 
-- **game id の予約と移譲**:先着とする。ただし確定するのは作者が承認した瞬間であり、承認待ちの投稿は slug を確保しない
+- **game id の予約と移譲**:id は作者ごとの名前空間に閉じるので、他人による横取りは起きない。確定するのは作者が承認した瞬間であり、承認待ちの投稿は何も確保しない。譲渡は行わない
 - **Artifacts の iframe 可否**:不可。実測したところ `content-security-policy: frame-ancestors 'self'` が返る。postMessage モードの対象外とする

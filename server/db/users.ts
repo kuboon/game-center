@@ -16,6 +16,14 @@ export interface User {
   readonly handle: string | null;
 }
 
+/**
+ * A player who has chosen a handle.
+ *
+ * Worth its own type: a game's id is built from a handle, so the places that
+ * build one should be unable to reach a player who has none.
+ */
+export type NamedUser = User & { readonly handle: string };
+
 /** Raised when a handle is already someone else's, or already set. */
 export class HandleError extends Error {
   override readonly name = "HandleError";
@@ -83,12 +91,14 @@ export async function findUserByExternalId(
 export async function findUserByHandle(
   client: Client,
   handle: string,
-): Promise<User | null> {
+): Promise<NamedUser | null> {
   const result = await client.execute({
     sql: `${USER_COLUMNS} where handle = ?`,
     args: [handle.toLowerCase()],
   });
-  return toUser(result.rows[0]);
+  const user = toUser(result.rows[0]);
+  // Found by handle, so it has one — say so in the type.
+  return user?.handle ? { ...user, handle: user.handle } : null;
 }
 
 /**
@@ -108,7 +118,7 @@ export async function claimHandle(
   client: Client,
   userId: number,
   handle: string,
-): Promise<User> {
+): Promise<NamedUser> {
   const wanted = handle.toLowerCase();
   const existing = await findUserById(client, userId);
   if (!existing) throw new HandleError("No such player");
@@ -132,7 +142,7 @@ export async function claimHandle(
 
   const updated = await findUserById(client, userId);
   if (!updated?.handle) throw new HandleError(`@${wanted} is taken`);
-  return updated;
+  return { ...updated, handle: updated.handle };
 }
 
 const USER_COLUMNS =

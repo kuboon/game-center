@@ -116,19 +116,33 @@ Deno.test("rollback reverts one migration at a time", async () => {
   });
 });
 
-Deno.test("every game has an author, and a handle belongs to one player", async () => {
+Deno.test("a slug is unique per author, not globally", async () => {
   await migratedDb(async (client) => {
     await client.execute(
       "insert into users (external_id, display_name, handle) values ('u', 'u', 'kuboon')",
     );
     await client.execute(
-      "insert into users (external_id, display_name) values ('v', 'v')",
+      "insert into users (external_id, display_name, handle) values ('v', 'v', 'someone-else')",
     );
+
+    const game = (id: string, ownerId: number, slug: string) =>
+      client.execute({
+        sql: `insert into games (id, owner_id, slug, title, url)
+              values (?, ?, ?, 't', 'https://example.com/')`,
+        args: [id, ownerId, slug],
+      });
+
+    // Two authors, one slug, no argument.
+    await game("kuboon/tetris", 1, "tetris");
+    await game("someone-else/tetris", 2, "tetris");
+
+    // One author cannot use a slug twice.
+    await assertRejects(() => game("kuboon/tetris-2", 1, "tetris"));
 
     // A game with no author cannot be attributed to anyone.
     await assertRejects(() =>
       client.execute(
-        `insert into games (id, title, url) values ('orphan', 't', 'https://example.com/')`,
+        `insert into games (id, slug, title, url) values ('orphan', 'orphan', 't', 'https://example.com/')`,
       )
     );
 
@@ -138,25 +152,10 @@ Deno.test("every game has an author, and a handle belongs to one player", async 
         "update users set handle = 'kuboon' where external_id = 'v'",
       )
     );
-
-    // The author and the writing URL live side by side now.
-    await client.execute({
-      sql: `insert into games (id, owner_id, manifest_url, title, url)
-            values ('g', 1, ?, 't', 'https://example.com/')`,
-      args: ["https://example.com/gamecenter.json"],
-    });
-    const stored = await client.execute(
-      "select owner_id, manifest_url from games",
-    );
-    assertEquals(Number(stored.rows[0].owner_id), 1);
-    assertEquals(
-      String(stored.rows[0].manifest_url),
-      "https://example.com/gamecenter.json",
-    );
   });
 });
 
-Deno.test("a pending registration holds no slug", async () => {
+Deno.test("a pending registration reserves nothing", async () => {
   await migratedDb(async (client) => {
     await client.execute(
       "insert into users (external_id, display_name, handle) values ('u', 'u', 'kuboon')",
@@ -164,12 +163,12 @@ Deno.test("a pending registration holds no slug", async () => {
     const submit = (url: string) =>
       client.execute({
         sql: `insert into game_registrations
-                (game_id, manifest_url, game_url, author_id, manifest)
+                (slug, manifest_url, game_url, author_id, manifest)
               values ('my-puzzle', ?, 'https://example.com/', 1, '{}')`,
         args: [url],
       });
 
-    // Two submissions may claim the same id: neither has taken it.
+    // Two submissions may ask for the same slug: neither has taken it.
     await submit("https://a.example.com/gamecenter.json");
     await submit("https://b.example.com/gamecenter.json");
     const waiting = await client.execute(
@@ -189,13 +188,19 @@ Deno.test("schema accepts a full unlock round trip", async () => {
       args: ["idp-user-1", "kuboon"],
     });
     await client.execute({
-      sql: "insert into games (id, owner_id, title, url) values (?, 1, ?, ?)",
-      args: ["my-puzzle", "My Puzzle", "https://example.github.io/my-puzzle/"],
+      sql:
+        "insert into games (id, owner_id, slug, title, url) values (?, 1, ?, ?, ?)",
+      args: [
+        "kuboon/my-puzzle",
+        "my-puzzle",
+        "My Puzzle",
+        "https://example.github.io/my-puzzle/",
+      ],
     });
     await client.execute({
       sql:
         "insert into achievements (game_id, key, title, points) values (?, ?, ?, ?)",
-      args: ["my-puzzle", "first_clear", "はじめてのクリア", 10],
+      args: ["kuboon/my-puzzle", "first_clear", "はじめてのクリア", 10],
     });
     await client.execute({
       sql:
@@ -219,10 +224,10 @@ Deno.test("schema enforces the constraints unlocking relies on", async () => {
       "insert into users (external_id, display_name) values ('u', 'u')",
     );
     await client.execute(
-      "insert into games (id, owner_id, title, url) values ('g', 1, 'g', 'https://example.com/')",
+      "insert into games (id, owner_id, slug, title, url) values ('u/g', 1, 'g', 'g', 'https://example.com/')",
     );
     const achievement =
-      "insert into achievements (game_id, key, title) values ('g', 'k', 'k')";
+      "insert into achievements (game_id, key, title) values ('u/g', 'k', 'k')";
     await client.execute(achievement);
 
     // One achievement key per game.
@@ -231,7 +236,7 @@ Deno.test("schema enforces the constraints unlocking relies on", async () => {
     // Foreign keys are on: libSQL enables them, unlike stock SQLite.
     await assertRejects(() =>
       client.execute(
-        "insert into games (id, owner_id, title, url) values ('x', 999, 'x', 'https://example.com/')",
+        "insert into games (id, owner_id, slug, title, url) values ('x/x', 999, 'x', 'x', 'https://example.com/')",
       )
     );
 

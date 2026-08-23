@@ -41,7 +41,12 @@ export interface AchievementManifest {
 
 /** A game as its manifest declares it. */
 export interface GameManifest {
-  /** Globally unique slug, claimed when the author approves the registration. */
+  /**
+   * The game's slug, unique among this author's games rather than globally.
+   *
+   * Its full name is `{author}/{id}` — see {@link gameRef} — so two authors can
+   * both have a `tetris` and nobody has to check whether a name is free.
+   */
   readonly id: string;
   /**
    * The author's game-center handle.
@@ -322,6 +327,32 @@ function requireHttpsUrl(
   if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocal)) {
     add(path, "must be https (http is allowed only for localhost)");
   }
+}
+
+/**
+ * A game's full name: the author's handle and the slug they gave it.
+ *
+ * This is what the hub stores as the game's id, what a launch token names in
+ * `aud`, and what appears in URLs as `/@{author}/{slug}`. Building it in one
+ * place keeps the two spellings from drifting.
+ */
+export function gameRef(author: string, slug: string): string {
+  return `${author}/${slug}`;
+}
+
+/**
+ * Split a full name back into its parts.
+ *
+ * @param ref A game reference, with or without a leading `@`
+ * @returns The author and slug, or null when it is not one
+ */
+export function parseGameRef(
+  ref: string,
+): { author: string; slug: string } | null {
+  const [author, slug, ...rest] = ref.replace(/^@/, "").split("/");
+  if (!author || !slug || rest.length > 0) return null;
+  if (!HANDLE_PATTERN.test(author) || !ID_PATTERN.test(slug)) return null;
+  return { author, slug };
 }
 
 /** Render issues as one message, for a CI log or an API error body. */

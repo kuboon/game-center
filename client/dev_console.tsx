@@ -40,7 +40,9 @@ interface Achievement {
 }
 
 interface Game {
+  /** `{author}/{slug}` — the game's full name. */
   id: string;
+  slug: string;
   title: string;
   url: string;
   manifestUrl: string | null;
@@ -51,7 +53,8 @@ interface Game {
 /** A submission naming this account as author, not yet agreed to. */
 interface Pending {
   id: number;
-  gameId: string;
+  /** The slug asked for. Not qualified yet, because it is not taken yet. */
+  slug: string;
   title: string;
   manifestUrl: string;
   gameUrl: string;
@@ -337,7 +340,10 @@ export const DevConsole = clientEntry(
                       <li key={entry.id} class="border-base-300 border-t pt-3">
                         <div class="flex items-baseline gap-2">
                           <span class="font-bold">{entry.title}</span>
-                          <code class="text-sm opacity-70">{entry.gameId}</code>
+                          <code class="text-sm opacity-70">
+                            {myHandle ? `${myHandle}/` : ""}
+                            {entry.slug}
+                          </code>
                         </div>
                         <p class="text-sm break-all">
                           取得元 <code>{entry.manifestUrl}</code>

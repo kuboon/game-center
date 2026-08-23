@@ -55,11 +55,11 @@ const submit = (
   client: Client,
   authorId: number,
   overrides: Partial<
-    { gameId: string; manifestUrl: string; manifest: GameManifest }
+    { slug: string; manifestUrl: string; manifest: GameManifest }
   > = {},
 ) =>
   submitRegistration(client, authorId, {
-    gameId: overrides.gameId ?? "my-puzzle",
+    slug: overrides.slug ?? "my-puzzle",
     manifestUrl: overrides.manifestUrl ?? MANIFEST_URL,
     gameUrl: GAME_URL,
     manifest: overrides.manifest ?? manifest(),
@@ -75,26 +75,51 @@ Deno.test("a submission registers nothing on its own", async () => {
   });
 });
 
-Deno.test("a pending submission does not hold the game id", async () => {
+Deno.test("a pending submission holds no slug, so one author can race themselves", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+
+    // The same author submitted the same slug from two different URLs.
+    await submit(client, kuboon.id, { manifestUrl: "https://a.example.com/" });
+    await submit(client, kuboon.id, { manifestUrl: "https://b.example.com/" });
+
+    // Whichever they approve first takes the name; the other then collides.
+    const [first, second] = await listPending(client, kuboon.id);
+    assertEquals(
+      (await approveRegistration(client, kuboon, first)).status,
+      201,
+    );
+    assertEquals(
+      (await approveRegistration(client, kuboon, second)).status,
+      409,
+    );
+    assertEquals(
+      (await findGame(client, "kuboon/my-puzzle"))?.manifestUrl,
+      "https://a.example.com/",
+    );
+  });
+});
+
+Deno.test("another author submitting the same slug collides with nobody", async () => {
   await migratedDb(async (client) => {
     const kuboon = await author(client);
     const other = await author(client, "idp-other", "someone-else");
 
-    // Two people submitted manifests claiming the same slug. Neither has it.
-    await submit(client, kuboon.id, {
-      manifestUrl: "https://a.example.com/",
+    await submit(client, kuboon.id);
+    await submit(client, other.id, {
+      manifestUrl: "https://b.example.com/",
+      manifest: manifest({ author: "someone-else" }),
     });
-    await submit(client, other.id, { manifestUrl: "https://b.example.com/" });
 
-    // Whoever approves first takes it; the other's approval then collides.
-    const [waiting] = await listPending(client, other.id);
-    const first = await approveRegistration(client, other, waiting);
-    assertEquals(first.status, 201);
-
-    const [late] = await listPending(client, kuboon.id);
-    const second = await approveRegistration(client, kuboon, late);
-    assertEquals(second.status, 409);
-    assertEquals((await findGame(client, "my-puzzle"))?.ownerId, other.id);
+    const [mine] = await listPending(client, kuboon.id);
+    const [theirs] = await listPending(client, other.id);
+    assertEquals((await approveRegistration(client, kuboon, mine)).status, 201);
+    // Scoped by author, so this is a different game entirely.
+    assertEquals(
+      (await approveRegistration(client, other, theirs)).status,
+      201,
+    );
+    assertEquals((await listGames(client)).length, 2);
   });
 });
 
@@ -106,7 +131,7 @@ Deno.test("approving records the author and the URL that may write", async () =>
     const response = await approveRegistration(client, kuboon, pending);
     assertEquals(response.status, 201);
 
-    const game = await findGame(client, "my-puzzle");
+    const game = await findGame(client, "kuboon/my-puzzle");
     assertEquals(game?.ownerId, kuboon.id);
     assertEquals(game?.manifestUrl, MANIFEST_URL);
   });
@@ -199,7 +224,11 @@ Deno.test("an approved URL keeps writing without asking again", async () => {
     // What CI does on every later push.
     const updated = await registerGame(
       client,
-      { ownerId: kuboon.id, manifestUrl: MANIFEST_URL },
+      {
+        ownerId: kuboon.id,
+        authorHandle: kuboon.handle,
+        manifestUrl: MANIFEST_URL,
+      },
       manifest({ title: "My Puzzle 2" }),
       GAME_URL,
     );

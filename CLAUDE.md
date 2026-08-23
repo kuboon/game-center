@@ -83,6 +83,12 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 ゲームは `gamecenter.json` ひとつで自分を宣言する。マニフェスト全体の upsert
 なので、同じ内容を何度登録しても結果は変わらない。
 
+- **id は作者のハンドルで修飾する**(`kuboon/my-puzzle`)。マニフェストの `id`
+  は後半の slug だけで、作者の中で一意ならよい。他人に名前を取られないし、
+  マニフェストを書く LLM が空きを気にしなくてよい。URL は `/@kuboon/my-puzzle`
+  と `/claim/@kuboon/my-puzzle/{key}`。ハンドルを主キーに含められるのは、
+  ハンドルを変更せずゲームも譲渡しないため
+
 - マニフェストの置き場所は3つで、ハブはこの順に探す。ゲームのページに
   `<script type="application/gamecenter+json">` で埋め込む(主)、ページの隣に
   `gamecenter.json` を置く、ダッシュボードに貼り付ける

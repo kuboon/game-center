@@ -18,7 +18,7 @@
     },
     "id": {
       "type": "string",
-      "description": "Globally unique slug, claimed when the author approves the registration.",
+      "description": "The game's slug, unique among this author's games rather than globally. Its full name is {author}/{id}.",
       "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
     },
     "author": {

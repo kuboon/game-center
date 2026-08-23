@@ -4,6 +4,11 @@
  * Registering is an upsert of the whole manifest, which makes re-registering
  * harmless: sending the same document twice changes nothing.
  *
+ * A game's id is its author's handle and the slug they chose: `kuboon/tetris`.
+ * Scoping the slug that way means a name only has to be free among one author's
+ * games, so nobody can take one out from under anybody, and an LLM writing a
+ * manifest never has to guess whether a name is taken.
+ *
  * Every game has an author, and separately a URL that may write to it. The two
  * answer different questions. `owner_id` is who made it — shown in the catalog,
  * followed by players, and established once by the author approving the
@@ -16,12 +21,15 @@
  * their row, and `user_achievements` keeps pointing at something real.
  */
 
-import type { GameManifest } from "@game-center/protocol";
+import { type GameManifest, gameRef } from "@game-center/protocol";
 
 import type { Client } from "./client.ts";
 
 export interface Game {
+  /** `{author handle}/{slug}`. Globally unique because handles are. */
   readonly id: string;
+  /** The slug on its own, as the manifest wrote it. */
+  readonly slug: string;
   /** The author. Always set: a game without one cannot be attributed. */
   readonly ownerId: number;
   /** Where updates may come from. Null for a game pasted into the dashboard. */
@@ -58,6 +66,8 @@ export class GameOwnershipError extends Error {
  */
 export interface Registrant {
   readonly ownerId: number;
+  /** The author's handle, which qualifies the slug into an id. */
+  readonly authorHandle: string;
   readonly manifestUrl?: string;
 }
 
@@ -86,8 +96,9 @@ export async function registerGame(
   manifest: GameManifest,
   gameUrl: string,
 ): Promise<RegisterResult> {
-  const existing = await findGame(client, manifest.id);
-  if (existing) assertMayWrite(existing, registrant, manifest.id);
+  const id = gameRef(registrant.authorHandle, manifest.id);
+  const existing = await findGame(client, id);
+  if (existing) assertMayWrite(existing, registrant, id);
 
   const iconUrl = manifest.iconUrl
     ? new URL(manifest.iconUrl, gameUrl).href
@@ -104,17 +115,18 @@ export async function registerGame(
         manifest.description ?? null,
         gameUrl,
         iconUrl,
-        manifest.id,
+        id,
       ],
     });
   } else {
     await client.execute({
       sql: `insert into games
-              (id, owner_id, manifest_url, title, description, url, icon_url)
-            values (?, ?, ?, ?, ?, ?, ?)`,
+              (id, owner_id, slug, manifest_url, title, description, url, icon_url)
+            values (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        manifest.id,
+        id,
         registrant.ownerId,
+        manifest.id,
         registrant.manifestUrl ?? null,
         manifest.title,
         manifest.description ?? null,
@@ -124,11 +136,11 @@ export async function registerGame(
     });
   }
 
-  const retired = await reconcileAchievements(client, manifest);
+  const retired = await reconcileAchievements(client, id, manifest);
 
-  const game = await findGame(client, manifest.id);
+  const game = await findGame(client, id);
   if (!game) {
-    throw new Error(`Game ${manifest.id} vanished right after being written`);
+    throw new Error(`Game ${id} vanished right after being written`);
   }
   return { game, created: !existing, retired };
 }
@@ -170,9 +182,10 @@ function assertMayWrite(
  */
 async function reconcileAchievements(
   client: Client,
+  gameId: string,
   manifest: GameManifest,
 ): Promise<string[]> {
-  const stored = await listAchievements(client, manifest.id, {
+  const stored = await listAchievements(client, gameId, {
     includeRetired: true,
   });
   const byKey = new Map(stored.map((a) => [a.key, a]));
@@ -190,7 +203,7 @@ async function reconcileAchievements(
           achievement.points,
           achievement.hidden ? 1 : 0,
           index,
-          manifest.id,
+          gameId,
           achievement.key,
         ],
       });
@@ -200,7 +213,7 @@ async function reconcileAchievements(
                 (game_id, key, title, description, points, hidden, sort_order)
               values (?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          manifest.id,
+          gameId,
           achievement.key,
           achievement.title,
           achievement.description ?? null,
@@ -219,7 +232,7 @@ async function reconcileAchievements(
     retired.push(achievement.key);
     await client.execute({
       sql: "update achievements set retired = 1 where game_id = ? and key = ?",
-      args: [manifest.id, achievement.key],
+      args: [gameId, achievement.key],
     });
   }
   return retired;
@@ -261,8 +274,9 @@ export async function listGamesWithAuthors(
   client: Client,
 ): Promise<GameWithAuthor[]> {
   const result = await client.execute(
-    `select games.id, games.owner_id, games.manifest_url, games.title,
-            games.description, games.url, games.icon_url, games.status,
+    `select games.id, games.owner_id, games.slug, games.manifest_url,
+            games.title, games.description, games.url, games.icon_url,
+            games.status,
             users.handle as author_handle, users.display_name as author_name
        from games
        join users on users.id = games.owner_id
@@ -320,12 +334,14 @@ export async function listAchievements(
 }
 
 const GAME_COLUMNS =
-  `select id, owner_id, manifest_url, title, description, url, icon_url, status
+  `select id, owner_id, slug, manifest_url, title, description, url, icon_url,
+          status
      from games`;
 
 function toGame(row: Record<string, unknown>): Game {
   return {
     id: String(row.id),
+    slug: String(row.slug),
     ownerId: Number(row.owner_id),
     manifestUrl: row.manifest_url === null ? null : String(row.manifest_url),
     title: String(row.title),

@@ -13,9 +13,9 @@ import { del, get, post, route } from "@remix-run/fetch-router/routes";
 
 export const routes = route({
   home: get("/"),
-  game: get("/games/:id"),
-  claim: get("/claim/:gameId/:key"),
   author: get("/@:handle"),
+  game: get("/@:handle/:slug"),
+  claim: get("/claim/@:handle/:slug/:key"),
   me: get("/me"),
   dev: get("/dev"),
   schema: get("/schema/gamecenter.json"),

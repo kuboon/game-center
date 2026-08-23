@@ -122,7 +122,7 @@ export const AchievementList = clientEntry(
                 <p class="text-sm opacity-70">
                   <a
                     class="link"
-                    href={`/games/${unlock.gameId}`}
+                    href={`/@${unlock.gameId}`}
                     rmx-target="content"
                   >
                     {unlock.gameTitle}

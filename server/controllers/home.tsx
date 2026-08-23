@@ -67,7 +67,10 @@ function gameCard(game: GameWithAuthor) {
         <h2 class="card-title">
           <a
             class="link link-hover"
-            href={routes.game.href({ id: game.id })}
+            href={routes.game.href({
+              handle: game.authorHandle ?? "",
+              slug: game.slug,
+            })}
             rmx-target="content"
           >
             {game.title}

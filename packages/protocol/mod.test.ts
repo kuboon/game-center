@@ -3,7 +3,9 @@ import { assert, assertEquals } from "@std/assert";
 import {
   extractManifestScript,
   formatIssues,
+  gameRef,
   MANIFEST_SCRIPT_TYPE,
+  parseGameRef,
   parseManifest,
   parseManifestText,
   type ParseResult,
@@ -239,4 +241,30 @@ Deno.test("ends the script where a browser would", () => {
     `<script type="${MANIFEST_SCRIPT_TYPE}">{"title":"a<\\/script>b"}</script><p>after`;
   const text = extractManifestScript(html);
   assertEquals(text, '{"title":"a<\\/script>b"}');
+});
+
+Deno.test("a game's full name is its author and its slug", () => {
+  assertEquals(gameRef("kuboon", "my-puzzle"), "kuboon/my-puzzle");
+  assertEquals(parseGameRef("kuboon/my-puzzle"), {
+    author: "kuboon",
+    slug: "my-puzzle",
+  });
+  // The leading @ is how it is written in a URL.
+  assertEquals(parseGameRef("@kuboon/my-puzzle")?.author, "kuboon");
+});
+
+Deno.test("refuses a reference that is not one", () => {
+  for (
+    const ref of [
+      "my-puzzle",
+      "kuboon/",
+      "/my-puzzle",
+      "kuboon/my-puzzle/extra",
+      "Kuboon/my-puzzle",
+      "kuboon/My-Puzzle",
+      "",
+    ]
+  ) {
+    assertEquals(parseGameRef(ref), null, `accepted: ${ref}`);
+  }
 });
