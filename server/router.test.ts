@@ -87,7 +87,7 @@ Deno.test("GET /schema/gamecenter.json serves the manifest schema", async () => 
 
   const schema = await response.json();
   assertEquals(schema.$id, "https://ga-cen.kbn.one/schema/gamecenter.json");
-  assertEquals(schema.required, ["id", "title", "achievements"]);
+  assertEquals(schema.required, ["id", "author", "title", "achievements"]);
 });
 
 Deno.test("the internal API refuses a request with no DPoP proof", async () => {
@@ -112,6 +112,36 @@ Deno.test("the registry API asks for a url, not a credential", async () => {
   // from.
   assertEquals(response.status, 400);
   assertStringIncludes((await response.json()).error, "url is required");
+});
+
+Deno.test("GET /@{handle} says so when the author is unknown", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/@nobody", {
+      headers: { "rmx-frame": "1" },
+    }),
+  );
+  assertEquals(response.status, 200);
+  assertStringIncludes(await response.text(), "この作者は見つかりません");
+});
+
+Deno.test("choosing a handle needs a session", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/internal/handle", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handle: "kuboon" }),
+    }),
+  );
+  assertEquals(response.status, 401);
+});
+
+Deno.test("approving a registration needs a session", async () => {
+  for (const method of ["POST", "DELETE"]) {
+    const response = await router.fetch(
+      new Request("http://localhost/api/internal/registrations/1", { method }),
+    );
+    assertEquals(response.status, 401, method);
+  }
 });
 
 Deno.test("the internal API still needs a session to register anything", async () => {

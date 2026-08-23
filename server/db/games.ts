@@ -4,11 +4,12 @@
  * Registering is an upsert of the whole manifest, which makes re-registering
  * harmless: sending the same document twice changes nothing.
  *
- * A game belongs either to a manifest URL or to an account, never both. A game
- * the hub fetched is owned by the URL it was fetched from — whoever can put a
- * file there controls it, which needs no credential to prove and cannot be
- * squatted by someone who does not run the site. A game pasted into the
- * dashboard has no such URL, so it belongs to the account that pasted it.
+ * Every game has an author, and separately a URL that may write to it. The two
+ * answer different questions. `owner_id` is who made it — shown in the catalog,
+ * followed by players, and established once by the author approving the
+ * registration. `manifest_url` is where updates may come from, so CI can push
+ * the same document on every commit without anyone approving again. A game
+ * pasted into the dashboard has no such URL and is only ever edited there.
  *
  * Achievements are reconciled rather than replaced. A definition dropped from
  * the manifest is hidden, never deleted — players who already unlocked it keep
@@ -21,9 +22,9 @@ import type { Client } from "./client.ts";
 
 export interface Game {
   readonly id: string;
-  /** Set when an account registered this game by hand. */
-  readonly ownerId: number | null;
-  /** Set when the hub fetched this game's manifest. Its proof of ownership. */
+  /** The author. Always set: a game without one cannot be attributed. */
+  readonly ownerId: number;
+  /** Where updates may come from. Null for a game pasted into the dashboard. */
   readonly manifestUrl: string | null;
   readonly title: string;
   readonly description: string | null;
@@ -51,12 +52,14 @@ export class GameOwnershipError extends Error {
 /**
  * Who is registering, and therefore what they are allowed to overwrite.
  *
- * `manifestUrl` is the URL the manifest was fetched from; `ownerId` is the
- * account that pasted it. Exactly one is set, mirroring the table.
+ * The author is always known by the time this is built — either they approved
+ * the registration or they pasted it themselves. `manifestUrl` says whether
+ * this write came from the game's own URL.
  */
-export type Registrant =
-  | { readonly manifestUrl: string; readonly ownerId?: undefined }
-  | { readonly ownerId: number; readonly manifestUrl?: undefined };
+export interface Registrant {
+  readonly ownerId: number;
+  readonly manifestUrl?: string;
+}
 
 /** What an upsert did, so the caller can report it. */
 export interface RegisterResult {
@@ -71,7 +74,7 @@ export interface RegisterResult {
  * Register or update a game from its manifest.
  *
  * @param client Database to write to
- * @param registrant The manifest URL it was fetched from, or the account that pasted it
+ * @param registrant The author, and the manifest URL if it was fetched
  * @param manifest The validated manifest
  * @param gameUrl Where the game is played, already resolved to an absolute URL
  * @returns The stored game and what changed
@@ -111,7 +114,7 @@ export async function registerGame(
             values (?, ?, ?, ?, ?, ?, ?)`,
       args: [
         manifest.id,
-        registrant.ownerId ?? null,
+        registrant.ownerId,
         registrant.manifestUrl ?? null,
         manifest.title,
         manifest.description ?? null,
@@ -144,12 +147,15 @@ function assertMayWrite(
   id: string,
 ): void {
   if (existing.manifestUrl !== null) {
+    // Updates come from the URL the author already approved. The author
+    // themselves cannot overwrite it from elsewhere, because then a pasted
+    // manifest could quietly replace what the URL is serving.
     if (registrant.manifestUrl === existing.manifestUrl) return;
     throw new GameOwnershipError(
       `The game id "${id}" is registered from ${existing.manifestUrl}`,
     );
   }
-  if (existing.ownerId !== null && registrant.ownerId === existing.ownerId) {
+  if (!registrant.manifestUrl && registrant.ownerId === existing.ownerId) {
     return;
   }
   throw new GameOwnershipError(
@@ -239,7 +245,38 @@ export async function listGames(client: Client): Promise<Game[]> {
   return result.rows.map(toGame);
 }
 
-/** Games a player registered from the dashboard, whatever their status. */
+/** A game plus the author to credit for it. */
+export interface GameWithAuthor extends Game {
+  readonly authorHandle: string | null;
+  readonly authorName: string;
+}
+
+/**
+ * The catalog: active games with their authors.
+ *
+ * Joined rather than fetched per game, since the catalog exists to show the
+ * two together.
+ */
+export async function listGamesWithAuthors(
+  client: Client,
+): Promise<GameWithAuthor[]> {
+  const result = await client.execute(
+    `select games.id, games.owner_id, games.manifest_url, games.title,
+            games.description, games.url, games.icon_url, games.status,
+            users.handle as author_handle, users.display_name as author_name
+       from games
+       join users on users.id = games.owner_id
+      where games.status = 'active'
+      order by games.created_at desc`,
+  );
+  return result.rows.map((row) => ({
+    ...toGame(row),
+    authorHandle: row.author_handle === null ? null : String(row.author_handle),
+    authorName: String(row.author_name),
+  }));
+}
+
+/** Games a player wrote, whatever their status. */
 export async function listGamesOwnedBy(
   client: Client,
   ownerId: number,
@@ -289,7 +326,7 @@ const GAME_COLUMNS =
 function toGame(row: Record<string, unknown>): Game {
   return {
     id: String(row.id),
-    ownerId: row.owner_id === null ? null : Number(row.owner_id),
+    ownerId: Number(row.owner_id),
     manifestUrl: row.manifest_url === null ? null : String(row.manifest_url),
     title: String(row.title),
     description: row.description === null ? null : String(row.description),

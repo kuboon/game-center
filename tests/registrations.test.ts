@@ -1,0 +1,209 @@
+/**
+ * The approval handshake, end to end against a real database.
+ *
+ * A submission and an approval are two different claims — control of a URL, and
+ * consent of a person — and the point of the design is that neither works
+ * without the other. So most of what is tested here is what a submission alone
+ * does *not* do.
+ */
+
+import { assert, assertEquals } from "@std/assert";
+
+import type { GameManifest } from "@game-center/protocol";
+import { findGame, listGames, registerGame } from "../server/db/games.ts";
+import {
+  findPending,
+  listPending,
+  MAX_PENDING_PER_AUTHOR,
+  removePending,
+  submitRegistration,
+  TooManyPendingError,
+} from "../server/db/registrations.ts";
+import { claimHandle, upsertUser } from "../server/db/users.ts";
+import { approveRegistration } from "../server/lib/game_registration.ts";
+import { type Client, migratedDb } from "./support/db.ts";
+
+const GAME_URL = "https://example.github.io/my-puzzle/";
+const MANIFEST_URL = "https://example.github.io/my-puzzle/";
+
+const manifest = (overrides: Partial<GameManifest> = {}): GameManifest => ({
+  id: "my-puzzle",
+  author: "kuboon",
+  title: "My Puzzle",
+  achievements: [
+    {
+      key: "first_clear",
+      title: "はじめてのクリア",
+      points: 10,
+      hidden: false,
+    },
+  ],
+  ...overrides,
+});
+
+/** An author with a handle, ready to be named by a manifest. */
+async function author(
+  client: Client,
+  externalId = "idp-author",
+  handle = "kuboon",
+) {
+  const user = await upsertUser(client, externalId, externalId);
+  return await claimHandle(client, user.id, handle);
+}
+
+const submit = (
+  client: Client,
+  authorId: number,
+  overrides: Partial<
+    { gameId: string; manifestUrl: string; manifest: GameManifest }
+  > = {},
+) =>
+  submitRegistration(client, authorId, {
+    gameId: overrides.gameId ?? "my-puzzle",
+    manifestUrl: overrides.manifestUrl ?? MANIFEST_URL,
+    gameUrl: GAME_URL,
+    manifest: overrides.manifest ?? manifest(),
+  });
+
+Deno.test("a submission registers nothing on its own", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    await submit(client, kuboon.id);
+
+    assertEquals(await listGames(client), []);
+    assertEquals((await listPending(client, kuboon.id)).length, 1);
+  });
+});
+
+Deno.test("a pending submission does not hold the game id", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    const other = await author(client, "idp-other", "someone-else");
+
+    // Two people submitted manifests claiming the same slug. Neither has it.
+    await submit(client, kuboon.id, {
+      manifestUrl: "https://a.example.com/",
+    });
+    await submit(client, other.id, { manifestUrl: "https://b.example.com/" });
+
+    // Whoever approves first takes it; the other's approval then collides.
+    const [waiting] = await listPending(client, other.id);
+    const first = await approveRegistration(client, other, waiting);
+    assertEquals(first.status, 201);
+
+    const [late] = await listPending(client, kuboon.id);
+    const second = await approveRegistration(client, kuboon, late);
+    assertEquals(second.status, 409);
+    assertEquals((await findGame(client, "my-puzzle"))?.ownerId, other.id);
+  });
+});
+
+Deno.test("approving records the author and the URL that may write", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    const pending = await submit(client, kuboon.id);
+
+    const response = await approveRegistration(client, kuboon, pending);
+    assertEquals(response.status, 201);
+
+    const game = await findGame(client, "my-puzzle");
+    assertEquals(game?.ownerId, kuboon.id);
+    assertEquals(game?.manifestUrl, MANIFEST_URL);
+  });
+});
+
+Deno.test("re-submitting one URL replaces what is waiting", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    await submit(client, kuboon.id);
+    await submit(client, kuboon.id, {
+      manifest: manifest({ title: "My Puzzle 2" }),
+    });
+
+    // CI may run many times before anyone approves; the author should see the
+    // document as it stands now, not a pile of old ones.
+    const waiting = await listPending(client, kuboon.id);
+    assertEquals(waiting.length, 1);
+    assertEquals(waiting[0].manifest.title, "My Puzzle 2");
+  });
+});
+
+Deno.test("keeps one author's queue out of another's", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    const other = await author(client, "idp-other", "someone-else");
+    const pending = await submit(client, kuboon.id);
+
+    assertEquals(await listPending(client, other.id), []);
+    // A guessed id belonging to someone else simply is not found.
+    assertEquals(await findPending(client, other.id, pending.id), null);
+    assertEquals(await removePending(client, other.id, pending.id), false);
+    assert(await findPending(client, kuboon.id, pending.id));
+  });
+});
+
+Deno.test("dismissing takes a submission off the queue", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    const pending = await submit(client, kuboon.id);
+
+    assertEquals(await removePending(client, kuboon.id, pending.id), true);
+    assertEquals(await listPending(client, kuboon.id), []);
+    assertEquals(await listGames(client), []);
+  });
+});
+
+Deno.test("caps how much one author's queue can be filled with", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    for (let i = 0; i < MAX_PENDING_PER_AUTHOR; i++) {
+      await submit(client, kuboon.id, {
+        manifestUrl: `https://example.com/${i}/`,
+      });
+    }
+
+    // Anyone may name anyone as author, so the queue is the spam surface.
+    let refused = false;
+    try {
+      await submit(client, kuboon.id, {
+        manifestUrl: "https://example.com/one-too-many/",
+      });
+    } catch (error) {
+      refused = error instanceof TooManyPendingError;
+    }
+    assert(refused, "an unbounded queue is a spam target");
+
+    // A URL already in the queue still updates: it takes no new room.
+    await submit(client, kuboon.id, { manifestUrl: "https://example.com/0/" });
+  });
+});
+
+Deno.test("approving twice is caught by the game's own ownership rule", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    const pending = await submit(client, kuboon.id);
+    await approveRegistration(client, kuboon, pending);
+
+    // Same URL, so this is an update rather than a second claim.
+    const again = await approveRegistration(client, kuboon, pending);
+    assertEquals(again.status, 200);
+    assertEquals((await listGames(client)).length, 1);
+  });
+});
+
+Deno.test("an approved URL keeps writing without asking again", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    await approveRegistration(client, kuboon, await submit(client, kuboon.id));
+
+    // What CI does on every later push.
+    const updated = await registerGame(
+      client,
+      { ownerId: kuboon.id, manifestUrl: MANIFEST_URL },
+      manifest({ title: "My Puzzle 2" }),
+      GAME_URL,
+    );
+    assertEquals(updated.created, false);
+    assertEquals(updated.game.title, "My Puzzle 2");
+  });
+});

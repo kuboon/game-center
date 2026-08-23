@@ -25,6 +25,7 @@ const MANIFEST_URL = "https://example.github.io/my-puzzle/gamecenter.json";
 
 const manifest = (overrides: Partial<GameManifest> = {}): GameManifest => ({
   id: "my-puzzle",
+  author: "kuboon",
   title: "My Puzzle",
   description: "3分で遊べるパズル",
   achievements: [
@@ -39,28 +40,36 @@ const manifest = (overrides: Partial<GameManifest> = {}): GameManifest => ({
   ...overrides,
 });
 
-/** The usual registration: fetched from the game's own URL. */
-const fromUrl = (client: Client, m: GameManifest = manifest()) =>
-  registerGame(client, { manifestUrl: MANIFEST_URL }, m, GAME_URL);
-
 const owner = (client: Client, externalId = "idp-owner") =>
   upsertUser(client, externalId, externalId);
 
-Deno.test("claims the slug for the URL it was fetched from", async () => {
+/** The usual registration: the author's game, fetched from its own URL. */
+async function fromUrl(client: Client, m: GameManifest = manifest()) {
+  const author = await owner(client);
+  return await registerGame(
+    client,
+    { ownerId: author.id, manifestUrl: MANIFEST_URL },
+    m,
+    GAME_URL,
+  );
+}
+
+Deno.test("records both the author and the URL that may write to it", async () => {
   await migratedDb(async (client) => {
+    const author = await owner(client);
     const result = await fromUrl(client);
 
     assertEquals(result.created, true);
     assertEquals(result.game.id, "my-puzzle");
     assertEquals(result.game.manifestUrl, MANIFEST_URL);
-    assertEquals(result.game.ownerId, null);
+    assertEquals(result.game.ownerId, author.id);
     assertEquals(result.game.url, GAME_URL);
     assertEquals(result.retired, []);
     assertEquals((await listAchievements(client, "my-puzzle")).length, 2);
   });
 });
 
-Deno.test("claims the slug for the account that pasted it", async () => {
+Deno.test("records a pasted game against the account that pasted it", async () => {
   await migratedDb(async (client) => {
     const user = await owner(client);
     const result = await registerGame(
@@ -124,8 +133,8 @@ Deno.test("updates the fields a later manifest changes", async () => {
 
 Deno.test("keeps an achievement dropped from the manifest, but stops offering it", async () => {
   await migratedDb(async (client) => {
-    const player = await owner(client, "idp-player");
     await fromUrl(client);
+    const player = await owner(client, "idp-player");
 
     // Someone already unlocked what is about to disappear.
     const [, second] = await listAchievements(client, "my-puzzle");
@@ -181,12 +190,16 @@ Deno.test("un-retires an achievement the manifest brings back", async () => {
 Deno.test("refuses a slug another URL is already serving", async () => {
   await migratedDb(async (client) => {
     await fromUrl(client);
+    const intruder = await owner(client, "idp-intruder");
 
     await assertRejects(
       () =>
         registerGame(
           client,
-          { manifestUrl: "https://evil.example.com/gamecenter.json" },
+          {
+            ownerId: intruder.id,
+            manifestUrl: "https://evil.example.com/gamecenter.json",
+          },
           manifest({ title: "Mine now" }),
           "https://evil.example.com/",
         ),
@@ -219,28 +232,35 @@ Deno.test("refuses a slug another account pasted", async () => {
   });
 });
 
-Deno.test("neither kind of ownership can take over the other", async () => {
+Deno.test("a game served from a URL is only ever updated from that URL", async () => {
   await migratedDb(async (client) => {
     const user = await owner(client);
 
-    // A URL cannot take over what an account pasted...
-    await registerGame(client, { ownerId: user.id }, manifest(), GAME_URL);
-    await assertRejects(() => fromUrl(client), GameOwnershipError);
+    // Even its own author cannot overwrite it by pasting: that would let a
+    // hand-written manifest quietly replace what the URL is serving.
+    await fromUrl(client);
+    await assertRejects(
+      () => registerGame(client, { ownerId: user.id }, manifest(), GAME_URL),
+      GameOwnershipError,
+    );
 
-    // ...nor an account take over what a URL is serving.
+    // A pasted game likewise does not start accepting writes from a URL.
     await registerGame(
       client,
-      { manifestUrl: "https://example.github.io/other/gamecenter.json" },
+      { ownerId: user.id },
       manifest({ id: "other-game" }),
-      "https://example.github.io/other/",
+      GAME_URL,
     );
     await assertRejects(
       () =>
         registerGame(
           client,
-          { ownerId: user.id },
+          {
+            ownerId: user.id,
+            manifestUrl: "https://example.github.io/other/gamecenter.json",
+          },
           manifest({ id: "other-game" }),
-          GAME_URL,
+          "https://example.github.io/other/",
         ),
       GameOwnershipError,
     );

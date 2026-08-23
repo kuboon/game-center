@@ -12,6 +12,7 @@ import type { Action } from "@remix-run/fetch-router";
 import { PlayButton } from "../../client/play_button.tsx";
 import { getDb } from "../db/client.ts";
 import { type Achievement, findGame, listAchievements } from "../db/games.ts";
+import { findUserById } from "../db/users.ts";
 import { routes } from "../routes.ts";
 import { renderPage } from "../utils/render.tsx";
 
@@ -37,6 +38,7 @@ export const gamePageAction = {
 
     const achievements = await listAchievements(client, game.id);
     const points = achievements.reduce((sum, a) => sum + a.points, 0);
+    const author = await findUserById(client, game.ownerId);
 
     return renderPage(
       context,
@@ -53,6 +55,23 @@ export const gamePageAction = {
             : null}
           <div class="space-y-1">
             <h1 class="text-3xl font-bold">{game.title}</h1>
+            {author
+              ? (
+                <p class="text-sm opacity-70">
+                  作者 {author.handle
+                    ? (
+                      <a
+                        class="link"
+                        href={routes.author.href({ handle: author.handle })}
+                        rmx-target="content"
+                      >
+                        @{author.handle}
+                      </a>
+                    )
+                    : author.displayName}
+                </p>
+              )
+              : null}
             {game.description ? <p>{game.description}</p> : null}
             <p class="text-sm opacity-70 break-all">{game.url}</p>
           </div>

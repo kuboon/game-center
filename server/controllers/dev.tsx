@@ -16,6 +16,7 @@ const SNIPPET = `<script type="application/gamecenter+json">
 {
   "$schema": "https://ga-cen.kbn.one/schema/gamecenter.json",
   "id": "my-puzzle",
+  "author": "kuboon",
   "title": "My Puzzle",
   "achievements": [
     { "key": "first_clear", "title": "はじめてのクリア", "points": 10 }
@@ -45,7 +46,8 @@ export const devAction = {
             <p>
               ゲームのページに、ブラウザが無視する script
               として埋め込みます。実績を実装したコードと同じファイルに乗るので、
-              片方だけ古くなることがありません。
+              片方だけ古くなることがありません。 <code>author</code>{" "}
+              にはあなたのハンドルを書きます。
             </p>
             <pre class="bg-base-200 overflow-x-auto rounded-box p-4 text-sm"><code>{SNIPPET}</code></pre>
             <p>
@@ -67,12 +69,15 @@ export const devAction = {
           <div class="card-body">
             <h2 class="card-title">CI から登録する</h2>
             <p>
-              登録に認証は要りません。ハブがマニフェストを読みに行くだけで、
-              書き換えてよいかどうかは「その URL
-              に置けたこと」が決めるからです。 secret を発行して CI
-              に渡す手順はありません。
+              登録に認証は要りません。ハブがマニフェストを読みに行くだけだからです。
+              secret を発行して CI に渡す手順はありません。
             </p>
             <pre class="bg-base-200 overflow-x-auto rounded-box p-4 text-sm"><code>{CURL}</code></pre>
+            <p>
+              初回だけは、名指しされた作者がこのページで承認するまで完了しません
+              (202 が返ります)。 承認は一度きりで、以後その URL
+              からの更新はそのまま通ります。
+            </p>
           </div>
         </div>
 

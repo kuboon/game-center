@@ -25,6 +25,7 @@ const MANIFEST_URL = "https://example.github.io/my-puzzle/gamecenter.json";
 
 const manifest: GameManifest = {
   id: "my-puzzle",
+  author: "kuboon",
   title: "My Puzzle",
   achievements: [
     {
@@ -44,8 +45,15 @@ async function playable(client: Client) {
   return player;
 }
 
-const register = (client: Client, m: GameManifest) =>
-  registerGame(client, { manifestUrl: MANIFEST_URL }, m, GAME_URL);
+async function register(client: Client, m: GameManifest) {
+  const author = await upsertUser(client, "idp-author", "author");
+  return await registerGame(
+    client,
+    { ownerId: author.id, manifestUrl: MANIFEST_URL },
+    m,
+    GAME_URL,
+  );
+}
 
 Deno.test("records an unlock the first time", async () => {
   await migratedDb(async (client) => {

@@ -1,13 +1,15 @@
 /**
- * The two ways a manifest gets into the registry.
+ * How a manifest becomes a registered game.
  *
- * Both end at the same {@link registerGame}, and both report problems the same
- * way, because a developer debugging a red CI run and a developer pasting into
- * the dashboard should not have to reconcile two vocabularies.
+ * Two halves have to meet. The document names its author by handle; the account
+ * with that handle says which documents are theirs. Either alone proves
+ * nothing — anyone can write a name in a file, and anyone can claim to have
+ * written a game — but together they establish both control of the URL and the
+ * author's consent, with no secret travelling between them.
  *
- * They differ in what vouches for the registration. Fetching one proves itself
- * — the document came from the URL it claims. Pasting one proves nothing about
- * the URL, so it is tied to the account that did it.
+ * When the person submitting *is* the named author, the second half has already
+ * happened and the game registers immediately. The queue exists for the case
+ * where nobody is present, which is to say for CI.
  */
 
 import {
@@ -24,22 +26,30 @@ import {
   registerGame,
   type Registrant,
 } from "../db/games.ts";
+import {
+  type PendingRegistration,
+  submitRegistration,
+  TooManyPendingError,
+} from "../db/registrations.ts";
+import { findUserByHandle, type User } from "../db/users.ts";
 import { apiError, apiJson } from "../utils/api.ts";
 import { fetchManifest, ManifestFetchError } from "./manifest_fetch.ts";
 
 /**
- * Register the game published at `url`.
+ * Register the game published at `url`, or queue it for its author.
  *
- * Nothing authenticates this: the caller only asks the hub to read a document,
- * and the document's location is what decides whether it may be written.
+ * Nothing authenticates the call itself. The manifest's location is what makes
+ * it writable, and the author's approval is what makes it theirs.
  *
  * @param client Database to write to
  * @param url The game's page URL
+ * @param submitter The signed-in caller, when there is one
  * @returns The response to send
  */
 export async function registerFromUrl(
   client: Client,
   url: string,
+  submitter?: User,
 ): Promise<Response> {
   let fetched;
   try {
@@ -49,36 +59,75 @@ export async function registerFromUrl(
       return manifestRejected(error.message, error.issues);
     }
     // A network failure is about the game's host, not about the request.
+    return apiError(`Could not read ${url}: ${(error as Error).message}`, 502);
+  }
+
+  const author = await findUserByHandle(client, fetched.manifest.author);
+  if (!author) {
     return apiError(
-      `Could not read ${url}: ${(error as Error).message}`,
-      502,
+      `No game-center account goes by @${fetched.manifest.author}`,
+      404,
     );
   }
 
-  return await store(
+  // Already this author's game: updates flow straight through, which is what
+  // lets CI push the same document on every commit.
+  const known = await isKnownUrl(
     client,
-    { manifestUrl: fetched.manifestUrl },
-    fetched.manifest,
-    fetched.gameUrl,
-    { source: fetched.source, manifestUrl: fetched.manifestUrl },
+    fetched.manifest.id,
+    fetched.manifestUrl,
   );
+
+  if (known || submitter?.id === author.id) {
+    return await store(
+      client,
+      { ownerId: author.id, manifestUrl: fetched.manifestUrl },
+      fetched.manifest,
+      fetched.gameUrl,
+      { source: fetched.source, manifestUrl: fetched.manifestUrl },
+    );
+  }
+
+  let pending: PendingRegistration;
+  try {
+    pending = await submitRegistration(client, author.id, {
+      gameId: fetched.manifest.id,
+      manifestUrl: fetched.manifestUrl,
+      gameUrl: fetched.gameUrl,
+      manifest: fetched.manifest,
+    });
+  } catch (error) {
+    if (error instanceof TooManyPendingError) {
+      return apiError(error.message, 429);
+    }
+    throw error;
+  }
+
+  return apiJson({
+    pending: true,
+    author: author.handle,
+    game: { id: pending.gameId, title: pending.manifest.title },
+    manifestUrl: pending.manifestUrl,
+    message:
+      `Waiting for @${author.handle} to approve this URL on their game-center dashboard. Nothing is registered until they do.`,
+  }, { status: 202 });
 }
 
 /**
  * Register a manifest pasted into the dashboard.
  *
- * For games with no public URL to fetch — a Claude Artifact, which serves a
- * shell rather than its own HTML, or anything still on a laptop. Here the
- * manifest must say where the game is, since nothing else can.
+ * For games the hub cannot fetch — a Claude Artifact, which serves a shell
+ * rather than the author's HTML, or anything still on a laptop. Only the named
+ * author may paste, since there is no URL here to vouch for anyone.
  *
  * @param client Database to write to
- * @param ownerId The account pasting it
+ * @param submitter The signed-in account doing the pasting
  * @param body The manifest, already parsed from JSON
  * @returns The response to send
  */
 export async function registerFromPaste(
   client: Client,
-  ownerId: number,
+  submitter: User,
   body: unknown,
 ): Promise<Response> {
   const parsed = parseManifest(body);
@@ -93,14 +142,60 @@ export async function registerFromPaste(
         "is required when the manifest is pasted, because there is no URL it was fetched from",
     }]);
   }
+  if (parsed.manifest.author !== submitter.handle) {
+    return manifestRejected("gamecenter.json is not valid", [{
+      path: "author",
+      message: submitter.handle
+        ? `must be @${submitter.handle}: a pasted manifest has no URL to vouch for anyone else`
+        : "cannot be checked until you choose a handle on your account page",
+    }]);
+  }
 
   return await store(
     client,
-    { ownerId },
+    { ownerId: submitter.id },
     parsed.manifest,
     parsed.manifest.url,
     { source: "pasted" },
   );
+}
+
+/**
+ * Complete a registration the author approved.
+ *
+ * The slug is claimed here rather than at submission, so a queue full of
+ * unapproved entries reserves nothing.
+ *
+ * @param client Database to write to
+ * @param author The approving account
+ * @param pending What they approved
+ * @returns The response to send
+ */
+export function approveRegistration(
+  client: Client,
+  author: User,
+  pending: PendingRegistration,
+): Promise<Response> {
+  return store(
+    client,
+    { ownerId: author.id, manifestUrl: pending.manifestUrl },
+    pending.manifest,
+    pending.gameUrl,
+    { source: "approved", manifestUrl: pending.manifestUrl },
+  );
+}
+
+/** Whether this game already accepts writes from this URL. */
+async function isKnownUrl(
+  client: Client,
+  gameId: string,
+  manifestUrl: string,
+): Promise<boolean> {
+  const result = await client.execute({
+    sql: "select 1 from games where id = ? and manifest_url = ?",
+    args: [gameId, manifestUrl],
+  });
+  return result.rows.length > 0;
 }
 
 async function store(

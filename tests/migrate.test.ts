@@ -26,7 +26,7 @@ import {
   withDb,
 } from "./support/db.ts";
 
-const LATEST_MIGRATION = "20260820120000";
+const LATEST_MIGRATION = "20260821000000";
 
 Deno.test("migrate creates every table the design declares", async () => {
   await migratedDb(async (client) => {
@@ -37,6 +37,7 @@ Deno.test("migrate creates every table the design declares", async () => {
         "games",
         "achievements",
         "user_achievements",
+        "game_registrations",
         "kv",
       ]
     ) {
@@ -72,15 +73,30 @@ Deno.test("rollback reverts one migration at a time", async () => {
   await withDb(async (url, client) => {
     assertOk(await runDb(url, "migrate"), "migrate");
 
+    // Undo authors: the approval queue and handles go.
+    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback authors");
+    assertEquals(
+      (await tableNames(client)).includes("game_registrations"),
+      false,
+    );
+    const columns = await client.execute("pragma table_info(users)");
+    assertEquals(
+      columns.rows.some((row) => String(row.name) === "handle"),
+      false,
+      "users.handle survived rollback",
+    );
+
     // Undo URL ownership: games belong to accounts again, and tokens return.
     assertOk(await runDb(url, "rollback", "--step", "1"), "rollback ownership");
     assert((await tableNames(client)).includes("api_tokens"));
 
     // Undo the retired column: the table is rebuilt without it.
     assertOk(await runDb(url, "rollback", "--step", "1"), "rollback retired");
-    const columns = await client.execute("pragma table_info(achievements)");
+    const achievementColumns = await client.execute(
+      "pragma table_info(achievements)",
+    );
     assertEquals(
-      columns.rows.some((row) => String(row.name) === "retired"),
+      achievementColumns.rows.some((row) => String(row.name) === "retired"),
       false,
       "achievements.retired survived rollback",
     );
@@ -100,34 +116,69 @@ Deno.test("rollback reverts one migration at a time", async () => {
   });
 });
 
-Deno.test("a game belongs to a URL or an account, never both or neither", async () => {
+Deno.test("every game has an author, and a handle belongs to one player", async () => {
   await migratedDb(async (client) => {
     await client.execute(
-      "insert into users (external_id, display_name) values ('u', 'u')",
+      "insert into users (external_id, display_name, handle) values ('u', 'u', 'kuboon')",
     );
-    const insert = (
-      id: string,
-      ownerId: number | null,
-      manifestUrl: string | null,
-    ) =>
+    await client.execute(
+      "insert into users (external_id, display_name) values ('v', 'v')",
+    );
+
+    // A game with no author cannot be attributed to anyone.
+    await assertRejects(() =>
+      client.execute(
+        `insert into games (id, title, url) values ('orphan', 't', 'https://example.com/')`,
+      )
+    );
+
+    // Handles are one per player.
+    await assertRejects(() =>
+      client.execute(
+        "update users set handle = 'kuboon' where external_id = 'v'",
+      )
+    );
+
+    // The author and the writing URL live side by side now.
+    await client.execute({
+      sql: `insert into games (id, owner_id, manifest_url, title, url)
+            values ('g', 1, ?, 't', 'https://example.com/')`,
+      args: ["https://example.com/gamecenter.json"],
+    });
+    const stored = await client.execute(
+      "select owner_id, manifest_url from games",
+    );
+    assertEquals(Number(stored.rows[0].owner_id), 1);
+    assertEquals(
+      String(stored.rows[0].manifest_url),
+      "https://example.com/gamecenter.json",
+    );
+  });
+});
+
+Deno.test("a pending registration holds no slug", async () => {
+  await migratedDb(async (client) => {
+    await client.execute(
+      "insert into users (external_id, display_name, handle) values ('u', 'u', 'kuboon')",
+    );
+    const submit = (url: string) =>
       client.execute({
-        sql: `insert into games (id, owner_id, manifest_url, title, url)
-              values (?, ?, ?, 't', 'https://example.com/')`,
-        args: [id, ownerId, manifestUrl],
+        sql: `insert into game_registrations
+                (game_id, manifest_url, game_url, author_id, manifest)
+              values ('my-puzzle', ?, 'https://example.com/', 1, '{}')`,
+        args: [url],
       });
 
-    await insert("pasted", 1, null);
-    await insert("fetched", null, "https://example.com/gamecenter.json");
-
-    // Neither: nothing could ever write to it again.
-    await assertRejects(() => insert("orphan", null, null));
-    // Both: two claims to the same game, with no rule for which wins.
-    await insert("hmm", 1, "https://example.com/other.json").then(
-      () => {
-        throw new Error("a game with both owners was accepted");
-      },
-      () => {},
+    // Two submissions may claim the same id: neither has taken it.
+    await submit("https://a.example.com/gamecenter.json");
+    await submit("https://b.example.com/gamecenter.json");
+    const waiting = await client.execute(
+      "select count(*) as n from game_registrations",
     );
+    assertEquals(Number(waiting.rows[0].n), 2);
+
+    // The same URL twice is one row, not two.
+    await assertRejects(() => submit("https://a.example.com/gamecenter.json"));
   });
 });
 

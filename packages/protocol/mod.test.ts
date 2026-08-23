@@ -12,6 +12,7 @@ import {
 /** A manifest with everything filled in, as a base for the invalid cases. */
 const valid = () => ({
   id: "my-puzzle",
+  author: "kuboon",
   title: "My Puzzle",
   description: "3分で遊べるパズル",
   url: "https://example.github.io/my-puzzle/",
@@ -73,7 +74,12 @@ Deno.test("rejects anything that is not an object", () => {
 
 Deno.test("reports every missing required field at once", () => {
   const result = parseManifest({});
-  assertEquals(paths(result).sort(), ["achievements", "id", "title"]);
+  assertEquals(paths(result).sort(), [
+    "achievements",
+    "author",
+    "id",
+    "title",
+  ]);
 });
 
 Deno.test("accepts a manifest with no url, since its location is its url", () => {
@@ -104,6 +110,16 @@ Deno.test("rejects a slug that would not survive a URL", () => {
       paths(parseManifest({ ...valid(), id })),
       ["id"],
       `accepted: ${id}`,
+    );
+  }
+});
+
+Deno.test("rejects an author that is not a handle", () => {
+  for (const author of ["Kuboon", "ku boon", "-lead", "trail-", "ab", "作者"]) {
+    assertEquals(
+      paths(parseManifest({ ...valid(), author })),
+      ["author"],
+      `accepted: ${author}`,
     );
   }
 });
@@ -170,7 +186,7 @@ Deno.test("formats issues one per line, with the field first", () => {
   const result = parseManifest({});
   assert(!result.ok);
   const text = formatIssues(result.issues);
-  assertEquals(text.split("\n").length, 3);
+  assertEquals(text.split("\n").length, 4);
   assert(text.includes("id: is required"), text);
 });
 

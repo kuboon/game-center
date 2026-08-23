@@ -10,9 +10,12 @@ import { createRouter, type Middleware } from "@remix-run/fetch-router";
 import { staticFiles } from "@remix-run/static-middleware";
 
 import {
+  internalApproveAction,
+  internalDismissAction,
   internalGamesAction,
   internalGamesRegisterAction,
 } from "./controllers/api/internal_games.ts";
+import { internalHandleAction } from "./controllers/api/internal_handle.ts";
 import { registryGamesAction } from "./controllers/api/registry_games.ts";
 import {
   gameAchievementsAction,
@@ -27,6 +30,7 @@ import {
 import { internalSessionAction } from "./controllers/api/session.ts";
 import { claimPageAction } from "./controllers/claim.tsx";
 import { devAction } from "./controllers/dev.tsx";
+import { authorPageAction } from "./controllers/author.tsx";
 import { gamePageAction } from "./controllers/game.tsx";
 import { homeAction } from "./controllers/home.tsx";
 import { meAction } from "./controllers/me.tsx";
@@ -51,6 +55,7 @@ const router = createRouter({ middleware: [serveBundled, gameCors, dpop] });
 router.get(routes.home, homeAction);
 router.get(routes.game, gamePageAction);
 router.get(routes.claim, claimPageAction);
+router.get(routes.author, authorPageAction);
 router.get(routes.me, meAction);
 router.get(routes.dev, devAction);
 router.get(routes.schema, schemaAction);
@@ -58,6 +63,9 @@ router.get(routes.schema, schemaAction);
 router.post(routes.internalSession, internalSessionAction);
 router.get(routes.internalGames, internalGamesAction);
 router.post(routes.internalGamesRegister, internalGamesRegisterAction);
+router.post(routes.internalHandle, internalHandleAction);
+router.post(routes.internalApprove, internalApproveAction);
+router.delete(routes.internalDismiss, internalDismissAction);
 router.post(routes.internalLaunch, internalLaunchAction);
 router.post(routes.internalClaim, internalClaimAction);
 router.get(routes.internalMeAchievements, internalMeAchievementsAction);

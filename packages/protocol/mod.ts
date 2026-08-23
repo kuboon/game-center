@@ -18,6 +18,9 @@
  *    their HTML clean.
  * 3. Pasted into the hub's dashboard, for games with no public URL to fetch.
  *
+ * Wherever it comes from, the manifest names its author by handle, and the
+ * registration only completes once that account approves it.
+ *
  * The JSON Schema next door (`schema.json`) describes the same document for
  * editors, and is served from the hub so `$schema` resolves.
  *
@@ -38,8 +41,16 @@ export interface AchievementManifest {
 
 /** A game as its manifest declares it. */
 export interface GameManifest {
-  /** Globally unique slug, claimed by the first URL or account to register it. */
+  /** Globally unique slug, claimed when the author approves the registration. */
   readonly id: string;
+  /**
+   * The author's game-center handle.
+   *
+   * Half of what establishes a registration: the document says who wrote it,
+   * and that account says which documents are theirs. Neither alone is worth
+   * anything, which is why no secret has to travel between them.
+   */
+  readonly author: string;
   readonly title: string;
   readonly description?: string;
   /**
@@ -81,6 +92,9 @@ export const MANIFEST_FILENAME = "gamecenter.json";
 
 /** Slugs are lowercase so a game's URL never depends on how it was typed. */
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+/** Handles are lowercase for the same reason slugs are: they end up in URLs. */
+export const HANDLE_PATTERN = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
+
 /** Achievement keys allow underscores, matching how they read in code. */
 const KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}[a-z0-9]$/;
 
@@ -116,6 +130,14 @@ export function parseManifest(value: unknown): ParseResult {
     );
   }
 
+  const author = requireString(value.author, "author", add);
+  if (author !== undefined && !HANDLE_PATTERN.test(author)) {
+    add(
+      "author",
+      "must be a game-center handle: 3-32 characters of lowercase letters, digits, and hyphens",
+    );
+  }
+
   const title = requireString(value.title, "title", add);
   if (title !== undefined && title.length > MAX_TITLE) {
     add("title", `must be at most ${MAX_TITLE} characters`);
@@ -143,6 +165,7 @@ export function parseManifest(value: unknown): ParseResult {
     ok: true,
     manifest: {
       id: id!,
+      author: author!,
       title: title!,
       ...(description !== undefined ? { description } : {}),
       ...(url !== undefined ? { url } : {}),

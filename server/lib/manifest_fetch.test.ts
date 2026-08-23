@@ -14,6 +14,7 @@ import { fetchManifest, ManifestFetchError } from "./manifest_fetch.ts";
 const PAGE = "https://example.github.io/my-puzzle/";
 const MANIFEST = JSON.stringify({
   id: "my-puzzle",
+  author: "kuboon",
   title: "My Puzzle",
   achievements: [{ key: "first_clear", title: "はじめてのクリア", points: 10 }],
 });
@@ -70,7 +71,12 @@ Deno.test("prefers the embedded manifest when both exist", async () => {
         `<script type="${MANIFEST_SCRIPT_TYPE}">${MANIFEST}</script>`,
       ),
       [`${PAGE}gamecenter.json`]: new Response(
-        JSON.stringify({ id: "stale", title: "Stale", achievements: [] }),
+        JSON.stringify({
+          id: "stale",
+          author: "kuboon",
+          title: "Stale",
+          achievements: [],
+        }),
       ),
     }),
   });
@@ -103,6 +109,7 @@ Deno.test("reports the manifest's own problems field by field", async () => {
   );
   assertEquals(error.issues.map((issue) => issue.path).sort(), [
     "achievements",
+    "author",
     "id",
   ]);
 });

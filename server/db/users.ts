@@ -12,6 +12,13 @@ export interface User {
   readonly externalId: string;
   readonly displayName: string;
   readonly avatarUrl: string | null;
+  /** Public name, chosen once. Null until the player picks one. */
+  readonly handle: string | null;
+}
+
+/** Raised when a handle is already someone else's, or already set. */
+export class HandleError extends Error {
+  override readonly name = "HandleError";
 }
 
 /**
@@ -49,8 +56,7 @@ export async function findUserById(
   id: number,
 ): Promise<User | null> {
   const result = await client.execute({
-    sql:
-      "select id, external_id, display_name, avatar_url from users where id = ?",
+    sql: `${USER_COLUMNS} where id = ?`,
     args: [id],
   });
   return toUser(result.rows[0]);
@@ -62,12 +68,75 @@ export async function findUserByExternalId(
   externalId: string,
 ): Promise<User | null> {
   const result = await client.execute({
-    sql:
-      "select id, external_id, display_name, avatar_url from users where external_id = ?",
+    sql: `${USER_COLUMNS} where external_id = ?`,
     args: [externalId],
   });
   return toUser(result.rows[0]);
 }
+
+/**
+ * Look up a player by their public handle.
+ *
+ * This is how a manifest names its author, so an unknown handle has to be
+ * distinguishable from a taken one.
+ */
+export async function findUserByHandle(
+  client: Client,
+  handle: string,
+): Promise<User | null> {
+  const result = await client.execute({
+    sql: `${USER_COLUMNS} where handle = ?`,
+    args: [handle.toLowerCase()],
+  });
+  return toUser(result.rows[0]);
+}
+
+/**
+ * Give a player their handle.
+ *
+ * Set once and not changed: it goes into manifests that the hub does not
+ * control, and into author pages people link to. Renaming would silently break
+ * every game whose `author` still says the old one.
+ *
+ * @param client Database to write to
+ * @param userId The player
+ * @param handle The requested handle, already known to be well-formed
+ * @returns The updated player
+ * @throws {HandleError} when they already have one, or someone else does
+ */
+export async function claimHandle(
+  client: Client,
+  userId: number,
+  handle: string,
+): Promise<User> {
+  const wanted = handle.toLowerCase();
+  const existing = await findUserById(client, userId);
+  if (!existing) throw new HandleError("No such player");
+  if (existing.handle) {
+    throw new HandleError(`You already go by @${existing.handle}`);
+  }
+  if (await findUserByHandle(client, wanted)) {
+    throw new HandleError(`@${wanted} is taken`);
+  }
+
+  // The unique index is what actually decides, so a race between two players
+  // asking for the same handle ends here rather than in a double write.
+  try {
+    await client.execute({
+      sql: "update users set handle = ? where id = ? and handle is null",
+      args: [wanted, userId],
+    });
+  } catch {
+    throw new HandleError(`@${wanted} is taken`);
+  }
+
+  const updated = await findUserById(client, userId);
+  if (!updated?.handle) throw new HandleError(`@${wanted} is taken`);
+  return updated;
+}
+
+const USER_COLUMNS =
+  "select id, external_id, display_name, avatar_url, handle from users";
 
 function toUser(row: Record<string, unknown> | undefined): User | null {
   if (!row) return null;
@@ -76,5 +145,6 @@ function toUser(row: Record<string, unknown> | undefined): User | null {
     externalId: String(row.external_id),
     displayName: String(row.display_name),
     avatarUrl: row.avatar_url === null ? null : String(row.avatar_url),
+    handle: row.handle === null ? null : String(row.handle),
   };
 }
