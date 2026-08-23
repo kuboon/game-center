@@ -17,7 +17,7 @@ import {
   listGamesOwnedBy,
   registerGame,
 } from "../server/db/games.ts";
-import { claimHandle, upsertUser } from "../server/db/users.ts";
+import { upsertUser } from "../server/db/users.ts";
 import { type Client, migratedDb } from "./support/db.ts";
 
 const GAME_URL = "https://example.github.io/my-puzzle/";
@@ -45,12 +45,9 @@ const owner = (client: Client, externalId = "idp-owner") =>
 
 /** An author with the handle every manifest here names. */
 async function author(client: Client, handle = "kuboon") {
-  const user = await owner(client, `idp-${handle}`);
-  // Called from several tests and more than once per test, so it settles for
-  // the handle already being theirs.
-  return user.handle
-    ? { ...user, handle: user.handle }
-    : await claimHandle(client, user.id, handle);
+  // The handle is the IdP id, so naming the account names the handle.
+  const user = await owner(client, handle);
+  return { ...user, handle: handle };
 }
 
 /** The usual registration: the author's game, fetched from its own URL. */

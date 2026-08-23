@@ -17,7 +17,7 @@ import {
   UnknownAchievementError,
   unlockAchievement,
 } from "../server/db/unlocks.ts";
-import { claimHandle, upsertUser } from "../server/db/users.ts";
+import { upsertUser } from "../server/db/users.ts";
 import { type Client, migratedDb } from "./support/db.ts";
 
 const GAME_URL = "https://example.github.io/my-puzzle/";
@@ -46,15 +46,12 @@ async function playable(client: Client) {
 }
 
 async function register(client: Client, m: GameManifest) {
-  const user = await upsertUser(client, "idp-author", "author");
-  const author = user.handle
-    ? { ...user, handle: user.handle }
-    : await claimHandle(client, user.id, "kuboon");
+  const author = await upsertUser(client, "kuboon", "author");
   return await registerGame(
     client,
     {
       ownerId: author.id,
-      authorHandle: author.handle,
+      authorHandle: "kuboon",
       manifestUrl: MANIFEST_URL,
     },
     m,

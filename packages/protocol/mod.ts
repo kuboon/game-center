@@ -49,11 +49,14 @@ export interface GameManifest {
    */
   readonly id: string;
   /**
-   * The author's game-center handle.
+   * The author's game-center handle — the id their account signs in with.
    *
    * Half of what establishes a registration: the document says who wrote it,
    * and that account says which documents are theirs. Neither alone is worth
    * anything, which is why no secret has to travel between them.
+   *
+   * The hub's `/me` page hands this out ready to paste, since nobody should be
+   * transcribing an identifier by hand.
    */
   readonly author: string;
   readonly title: string;
@@ -97,8 +100,16 @@ export const MANIFEST_FILENAME = "gamecenter.json";
 
 /** Slugs are lowercase so a game's URL never depends on how it was typed. */
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
-/** Handles are lowercase for the same reason slugs are: they end up in URLs. */
-export const HANDLE_PATTERN = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
+/**
+ * What an author's handle may look like.
+ *
+ * Deliberately loose: a handle is the identifier the IdP issued, and its shape
+ * is not ours to legislate — it may be a UUID, an opaque token, or a number.
+ * All this insists on is that it survives a URL path segment unescaped, which
+ * is what unreserved characters mean. Case is preserved for the same reason:
+ * folding someone else's identifier is how two people become one.
+ */
+export const HANDLE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,62}[A-Za-z0-9]$/;
 
 /** Achievement keys allow underscores, matching how they read in code. */
 const KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}[a-z0-9]$/;
@@ -139,7 +150,7 @@ export function parseManifest(value: unknown): ParseResult {
   if (author !== undefined && !HANDLE_PATTERN.test(author)) {
     add(
       "author",
-      "must be a game-center handle: 3-32 characters of lowercase letters, digits, and hyphens",
+      "must be a game-center handle, as shown on the hub's /me page",
     );
   }
 

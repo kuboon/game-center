@@ -1,0 +1,12 @@
+-- Players stop choosing a handle; the IdP's user id becomes it.
+--
+-- Picking a name is a step before a player can publish anything, and it forces
+-- a decision they cannot undo on someone who has not yet decided they care. The
+-- id they already have works: it is unique, stable, and theirs.
+--
+-- The column stays rather than the code reading `external_id` directly, and
+-- that is the point. A game's id is built from the handle once and stored, so
+-- giving someone a shorter name later changes what their *next* game is called
+-- and leaves every published claim URL pointing at something that still exists.
+-- That is the whole reason not to collapse the two columns into one.
+update users set handle = external_id where handle is null;

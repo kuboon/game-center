@@ -124,17 +124,6 @@ Deno.test("GET /@{handle} says so when the author is unknown", async () => {
   assertStringIncludes(await response.text(), "この作者は見つかりません");
 });
 
-Deno.test("choosing a handle needs a session", async () => {
-  const response = await router.fetch(
-    new Request("http://localhost/api/internal/handle", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ handle: "kuboon" }),
-    }),
-  );
-  assertEquals(response.status, 401);
-});
-
 Deno.test("approving a registration needs a session", async () => {
   for (const method of ["POST", "DELETE"]) {
     const response = await router.fetch(

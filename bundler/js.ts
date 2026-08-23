@@ -13,7 +13,7 @@ const CLIENT_ENTRIES = [
   "play_button.tsx",
   "claim_panel.tsx",
   "achievement_list.tsx",
-  "handle_card.tsx",
+  "prompt_card.tsx",
 ] as const;
 
 export async function buildJs(

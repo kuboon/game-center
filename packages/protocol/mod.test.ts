@@ -116,13 +116,28 @@ Deno.test("rejects a slug that would not survive a URL", () => {
   }
 });
 
-Deno.test("rejects an author that is not a handle", () => {
-  for (const author of ["Kuboon", "ku boon", "-lead", "trail-", "ab", "作者"]) {
+Deno.test("rejects an author that could not survive a URL", () => {
+  for (const author of ["ku boon", "-lead", "trail-", "a", "作者", "a/b", ""]) {
     assertEquals(
       paths(parseManifest({ ...valid(), author })),
       ["author"],
       `accepted: ${author}`,
     );
+  }
+});
+
+Deno.test("takes whatever shape the IdP issues as a handle", () => {
+  // Not ours to legislate: a UUID, an opaque token, or a number are all ids
+  // someone might actually sign in with.
+  for (
+    const author of [
+      "550e8400-e29b-41d4-a716-446655440000",
+      "Vk9tZ3JlZW4",
+      "1042",
+      "kuboon",
+    ]
+  ) {
+    assert(parseManifest({ ...valid(), author }).ok, `rejected: ${author}`);
   }
 });
 
@@ -260,7 +275,6 @@ Deno.test("refuses a reference that is not one", () => {
       "kuboon/",
       "/my-puzzle",
       "kuboon/my-puzzle/extra",
-      "Kuboon/my-puzzle",
       "kuboon/My-Puzzle",
       "",
     ]
