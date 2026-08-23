@@ -6,6 +6,7 @@
   "type": "object",
   "required": [
     "id",
+    "author",
     "title",
     "achievements"
   ],
@@ -17,8 +18,13 @@
     },
     "id": {
       "type": "string",
-      "description": "Globally unique slug, claimed by whoever registers it first.",
+      "description": "The game's slug, unique among this author's games rather than globally. Its full name is {author}/{id}.",
       "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
+    },
+    "author": {
+      "type": "string",
+      "description": "The author's game-center handle. The named account approves the registration on the hub, which is what completes it.",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$"
     },
     "title": {
       "type": "string",

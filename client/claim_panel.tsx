@@ -47,7 +47,7 @@ export const ClaimPanel = clientEntry(
     }
 
     const returnTo = () =>
-      `/claim/${handle.props.gameId}/${handle.props.achievementKey}` +
+      `/claim/@${handle.props.gameId}/${handle.props.achievementKey}` +
       (handle.props.score === null ? "" : `?score=${handle.props.score}`);
 
     const onSignInClick = () => sessionStore.signIn(returnTo());

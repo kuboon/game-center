@@ -13,6 +13,8 @@
 import type { Action } from "@remix-run/fetch-router";
 
 import { ClaimPanel } from "../../client/claim_panel.tsx";
+import { gameRef } from "@game-center/protocol";
+
 import { getDb } from "../db/client.ts";
 import { findGame, listAchievements } from "../db/games.ts";
 import { routes } from "../routes.ts";
@@ -20,7 +22,8 @@ import { renderPage } from "../utils/render.tsx";
 
 export const claimPageAction = {
   async handler(context) {
-    const { gameId, key } = context.params;
+    const { handle, slug, key } = context.params;
+    const gameId = gameRef(handle, slug);
     const client = getDb();
     const game = client ? await findGame(client, gameId) : null;
     const achievement = game
@@ -33,7 +36,7 @@ export const claimPageAction = {
         <main class="mx-auto w-full max-w-3xl space-y-6 p-8">
           <h1 class="text-3xl font-bold">この実績は見つかりません</h1>
           <p>
-            <code>{gameId}</code> の <code>{key}</code>{" "}
+            <code>@{gameId}</code> の <code>{key}</code>{" "}
             は登録されていないか、すでに廃止されています。
             ゲーム側のマニフェストが更新されている可能性があります。
           </p>
@@ -60,7 +63,7 @@ export const claimPageAction = {
             <p class="text-sm opacity-70">
               <a
                 class="link"
-                href={routes.game.href({ id: game.id })}
+                href={routes.game.href({ handle, slug })}
                 rmx-target="content"
               >
                 {game.title}

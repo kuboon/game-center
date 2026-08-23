@@ -17,7 +17,7 @@ import {
   UnknownAchievementError,
   unlockAchievement,
 } from "../server/db/unlocks.ts";
-import { upsertUser } from "../server/db/users.ts";
+import { claimHandle, upsertUser } from "../server/db/users.ts";
 import { type Client, migratedDb } from "./support/db.ts";
 
 const GAME_URL = "https://example.github.io/my-puzzle/";
@@ -25,6 +25,7 @@ const MANIFEST_URL = "https://example.github.io/my-puzzle/gamecenter.json";
 
 const manifest: GameManifest = {
   id: "my-puzzle",
+  author: "kuboon",
   title: "My Puzzle",
   achievements: [
     {
@@ -44,8 +45,22 @@ async function playable(client: Client) {
   return player;
 }
 
-const register = (client: Client, m: GameManifest) =>
-  registerGame(client, { manifestUrl: MANIFEST_URL }, m, GAME_URL);
+async function register(client: Client, m: GameManifest) {
+  const user = await upsertUser(client, "idp-author", "author");
+  const author = user.handle
+    ? { ...user, handle: user.handle }
+    : await claimHandle(client, user.id, "kuboon");
+  return await registerGame(
+    client,
+    {
+      ownerId: author.id,
+      authorHandle: author.handle,
+      manifestUrl: MANIFEST_URL,
+    },
+    m,
+    GAME_URL,
+  );
+}
 
 Deno.test("records an unlock the first time", async () => {
   await migratedDb(async (client) => {
@@ -53,7 +68,7 @@ Deno.test("records an unlock the first time", async () => {
     const result = await unlockAchievement(
       client,
       player.id,
-      "my-puzzle",
+      "kuboon/my-puzzle",
       "first_clear",
       { via: "rest" },
     );
@@ -73,14 +88,14 @@ Deno.test("reporting the same unlock again changes nothing", async () => {
     const first = await unlockAchievement(
       client,
       player.id,
-      "my-puzzle",
+      "kuboon/my-puzzle",
       "first_clear",
       { via: "claim" },
     );
     const again = await unlockAchievement(
       client,
       player.id,
-      "my-puzzle",
+      "kuboon/my-puzzle",
       "first_clear",
       { via: "rest" },
     );
@@ -98,7 +113,7 @@ Deno.test("keeps the highest score ever reported", async () => {
   await migratedDb(async (client) => {
     const player = await playable(client);
     const unlock = (score?: number) =>
-      unlockAchievement(client, player.id, "my-puzzle", "high_score", {
+      unlockAchievement(client, player.id, "kuboon/my-puzzle", "high_score", {
         via: "rest",
         score,
       });
@@ -122,7 +137,7 @@ Deno.test("takes the first score even when the unlock came without one", async (
   await migratedDb(async (client) => {
     const player = await playable(client);
     const unlock = (score?: number) =>
-      unlockAchievement(client, player.id, "my-puzzle", "high_score", {
+      unlockAchievement(client, player.id, "kuboon/my-puzzle", "high_score", {
         via: "rest",
         score,
       });
@@ -139,7 +154,7 @@ Deno.test("refuses an achievement the game never declared", async () => {
     const player = await playable(client);
     await assertRejects(
       () =>
-        unlockAchievement(client, player.id, "my-puzzle", "invented", {
+        unlockAchievement(client, player.id, "kuboon/my-puzzle", "invented", {
           via: "rest",
         }),
       UnknownAchievementError,
@@ -164,7 +179,7 @@ Deno.test("refuses an achievement the manifest retired", async () => {
 
     await assertRejects(
       () =>
-        unlockAchievement(client, player.id, "my-puzzle", "high_score", {
+        unlockAchievement(client, player.id, "kuboon/my-puzzle", "high_score", {
           via: "rest",
         }),
       UnknownAchievementError,
@@ -175,10 +190,16 @@ Deno.test("refuses an achievement the manifest retired", async () => {
 Deno.test("keeps an unlock the manifest later retired", async () => {
   await migratedDb(async (client) => {
     const player = await playable(client);
-    await unlockAchievement(client, player.id, "my-puzzle", "high_score", {
-      via: "rest",
-      score: 1200,
-    });
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "high_score",
+      {
+        via: "rest",
+        score: 1200,
+      },
+    );
 
     await register(client, {
       ...manifest,
@@ -198,20 +219,38 @@ Deno.test("adds up points across games, and keeps players apart", async () => {
     const player = await playable(client);
     const other = await upsertUser(client, "idp-other", "other");
 
-    await unlockAchievement(client, player.id, "my-puzzle", "first_clear", {
-      via: "rest",
-    });
-    await unlockAchievement(client, player.id, "my-puzzle", "high_score", {
-      via: "postmessage",
-    });
-    await unlockAchievement(client, other.id, "my-puzzle", "first_clear", {
-      via: "claim",
-    });
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      {
+        via: "rest",
+      },
+    );
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "high_score",
+      {
+        via: "postmessage",
+      },
+    );
+    await unlockAchievement(
+      client,
+      other.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      {
+        via: "claim",
+      },
+    );
 
     assertEquals(await totalPoints(client, player.id), 40);
     assertEquals(await totalPoints(client, other.id), 10);
     assertEquals(
-      (await listUnlocksForGame(client, other.id, "my-puzzle"))
+      (await listUnlocksForGame(client, other.id, "kuboon/my-puzzle"))
         .length,
       1,
     );
@@ -222,15 +261,31 @@ Deno.test("adds up points across games, and keeps players apart", async () => {
 Deno.test("lists one game's unlocks in manifest order", async () => {
   await migratedDb(async (client) => {
     const player = await playable(client);
-    await unlockAchievement(client, player.id, "my-puzzle", "high_score", {
-      via: "rest",
-    });
-    await unlockAchievement(client, player.id, "my-puzzle", "first_clear", {
-      via: "rest",
-    });
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "high_score",
+      {
+        via: "rest",
+      },
+    );
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      {
+        via: "rest",
+      },
+    );
 
-    const unlocks = await listUnlocksForGame(client, player.id, "my-puzzle");
+    const unlocks = await listUnlocksForGame(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+    );
     assertEquals(unlocks.map((u) => u.key), ["first_clear", "high_score"]);
-    assert(unlocks.every((u) => u.gameId === "my-puzzle"));
+    assert(unlocks.every((u) => u.gameId === "kuboon/my-puzzle"));
   });
 });

@@ -6,10 +6,15 @@
  *
  * Two ways to register, and the difference is worth showing rather than
  * hiding. Registering a URL is what a game should normally do — the hub reads
- * the manifest from the game's own page, so the game owns itself and nothing
- * here has to be kept in sync. Pasting is for a game the hub cannot fetch,
- * such as a Claude Artifact, whose public URL serves a shell rather than the
- * author's HTML.
+ * the manifest from the game's own page, so nothing here has to be kept in
+ * sync. Pasting is for a game the hub cannot fetch, such as a Claude Artifact,
+ * whose public URL serves a shell rather than the author's HTML.
+ *
+ * The queue is the other half of a registration. Anyone may ask the hub to read
+ * a manifest naming you as its author — the submission proves control of a URL,
+ * and approving it here is you agreeing to be that author. Which is also why
+ * the queue can hold things you never asked for, and dismissing costs one
+ * click.
  */
 
 import {
@@ -35,12 +40,26 @@ interface Achievement {
 }
 
 interface Game {
+  /** `{author}/{slug}` — the game's full name. */
   id: string;
+  slug: string;
   title: string;
   url: string;
   manifestUrl: string | null;
   status: string;
   achievements: Achievement[];
+}
+
+/** A submission naming this account as author, not yet agreed to. */
+interface Pending {
+  id: number;
+  /** The slug asked for. Not qualified yet, because it is not taken yet. */
+  slug: string;
+  title: string;
+  manifestUrl: string;
+  gameUrl: string;
+  achievements: number;
+  submittedAt: string;
 }
 
 interface ManifestIssue {
@@ -55,9 +74,11 @@ interface Outcome {
   readonly issues?: readonly ManifestIssue[];
 }
 
-const SAMPLE = `{
+const sample = (handle: string) =>
+  `{
   "$schema": "https://ga-cen.kbn.one/schema/gamecenter.json",
   "id": "my-puzzle",
+  "author": "${handle}",
   "title": "My Puzzle",
   "url": "https://claude.ai/public/artifacts/…",
   "achievements": [
@@ -69,6 +90,8 @@ export const DevConsole = clientEntry(
   "/dev_console.js#DevConsole",
   function DevConsole(handle: Handle<DevConsoleProps>) {
     let games: Game[] = [];
+    let pending: Pending[] = [];
+    let myHandle: string | null = null;
     let loaded = false;
     let loadError: string | null = null;
     let outcome: Outcome | null = null;
@@ -108,7 +131,14 @@ export const DevConsole = clientEntry(
       try {
         const response = await api("/api/internal/games");
         if (!response.ok) throw new Error(await messageOf(response));
-        games = ((await response.json()) as { games: Game[] }).games;
+        const body = await response.json() as {
+          handle: string | null;
+          games: Game[];
+          pending: Pending[];
+        };
+        games = body.games;
+        pending = body.pending;
+        myHandle = body.handle;
         loadError = null;
       } catch (cause) {
         loadError = (cause as Error).message;
@@ -167,6 +197,41 @@ export const DevConsole = clientEntry(
         handle.update();
       }
     }
+
+    /** Approving is the half of a registration only the named author can give. */
+    const decide = async (entry: Pending, approve: boolean) => {
+      busy = true;
+      outcome = null;
+      handle.update();
+      try {
+        const response = await api(`/api/internal/registrations/${entry.id}`, {
+          method: approve ? "POST" : "DELETE",
+        });
+        const result = await response.json() as {
+          error?: string;
+          game?: Game;
+        };
+        if (!response.ok) {
+          outcome = {
+            ok: false,
+            text: result.error ?? `HTTP ${response.status}`,
+          };
+          return;
+        }
+        outcome = {
+          ok: true,
+          text: approve
+            ? `${result.game?.title} を登録しました`
+            : `${entry.title} の登録を却下しました`,
+        };
+        await refresh();
+      } catch (cause) {
+        outcome = { ok: false, text: (cause as Error).message };
+      } finally {
+        busy = false;
+        handle.update();
+      }
+    };
 
     const onSignInClick = () => sessionStore.signIn(handle.props.returnTo);
 
@@ -243,6 +308,76 @@ export const DevConsole = clientEntry(
             )
             : null}
 
+          {myHandle ? null : (
+            <div class="alert alert-warning">
+              <div>
+                <p>
+                  まだハンドルを決めていません。 ゲームは作者を必要とするので、
+                  登録の前に{" "}
+                  <a class="link" href="/me" rmx-target="content">マイページ</a>
+                  {" "}
+                  でハンドルを決めてください。
+                </p>
+              </div>
+            </div>
+          )}
+
+          {pending.length === 0
+            ? null
+            : (
+              <div class="card card-border border-warning bg-base-100">
+                <div class="card-body">
+                  <h2 class="card-title">承認待ち {pending.length} 件</h2>
+                  <p class="text-sm opacity-70">
+                    あなたを作者として名指ししているマニフェストです。
+                    <strong>取得元の URL を確かめてから</strong>{" "}
+                    承認してください。承認すると、以後その URL
+                    からの更新は素通しになります。
+                    心当たりがなければ却下します。
+                  </p>
+                  <ul class="space-y-3">
+                    {pending.map((entry) => (
+                      <li key={entry.id} class="border-base-300 border-t pt-3">
+                        <div class="flex items-baseline gap-2">
+                          <span class="font-bold">{entry.title}</span>
+                          <code class="text-sm opacity-70">
+                            {myHandle ? `${myHandle}/` : ""}
+                            {entry.slug}
+                          </code>
+                        </div>
+                        <p class="text-sm break-all">
+                          取得元 <code>{entry.manifestUrl}</code>
+                        </p>
+                        <p class="text-sm opacity-70">
+                          実績 {entry.achievements} 件 / {entry.submittedAt}
+                        </p>
+                        <div class="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            class="btn btn-primary btn-xs"
+                            disabled={busy}
+                            mix={[on("click", () =>
+                              decide(entry, true))]}
+                          >
+                            承認して登録
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline btn-error btn-xs"
+                            disabled={busy}
+                            mix={[on("click", () =>
+                              decide(entry, false))]}
+                          >
+                            却下
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
           <div class="card card-border bg-base-100">
             <div class="card-body">
               <h2 class="card-title">URL から登録</h2>
@@ -305,9 +440,8 @@ export const DevConsole = clientEntry(
                   </ul>
                 )}
               <p class="text-sm opacity-70">
-                ここに出るのは、このアカウントが貼り付けで登録したゲームです。
-                URL 登録したゲームは URL の管理権が所有権なので、アカウントには
-                紐づきません。
+                あなたが作者として登録されているゲームです。 URL
+                登録のものは、その URL からの更新をそのまま受け付けます。
               </p>
             </div>
           </div>
@@ -318,11 +452,14 @@ export const DevConsole = clientEntry(
               <p class="text-sm opacity-70">
                 ハブが fetch できない場所のゲーム向けです。Claude Artifacts
                 は公開 URL を開いても著者の HTML ではなく殻が返るので、こちらを
-                使います。この場合は <code>url</code> が必須です。
+                使います。この場合は <code>url</code> が必須で、
+                <code>author</code>{" "}
+                はあなた自身でなければなりません。 URL
+                の裏付けがないので、他人の名義では貼れません。
               </p>
               <textarea
                 class="textarea textarea-bordered h-64 w-full font-mono text-sm"
-                placeholder={SAMPLE}
+                placeholder={sample(myHandle ?? "your-handle")}
                 mix={[on("input", (event) => {
                   manifestText = (event.currentTarget as HTMLTextAreaElement)
                     .value;

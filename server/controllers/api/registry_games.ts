@@ -2,12 +2,14 @@
  * POST /api/registry/v1/games — register the game published at a URL.
  *
  * Unauthenticated on purpose. The only thing this endpoint does is make the
- * hub re-read a document that its author already chose to publish, and the
- * document's location is what decides whether it may write. There is nothing a
- * credential would add, and the credential is the step a game's author cannot
- * automate.
+ * hub re-read a document that its author already chose to publish. What decides
+ * whether that document may write is its location, and what decides whose game
+ * it is, is the author approving it — neither of which a credential here would
+ * add anything to.
  *
- * Which is why the GitHub Action is a bare POST with no secret in it.
+ * Which is why the GitHub Action is a bare POST with no secret in it. A
+ * first-time submission answers 202 and waits for the author; every later one
+ * updates the game outright.
  */
 
 import type { Action } from "@remix-run/fetch-router";

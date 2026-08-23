@@ -9,12 +9,13 @@
  * the milestone that implements them.
  */
 
-import { get, post, route } from "@remix-run/fetch-router/routes";
+import { del, get, post, route } from "@remix-run/fetch-router/routes";
 
 export const routes = route({
   home: get("/"),
-  game: get("/games/:id"),
-  claim: get("/claim/:gameId/:key"),
+  author: get("/@:handle"),
+  game: get("/@:handle/:slug"),
+  claim: get("/claim/@:handle/:slug/:key"),
   me: get("/me"),
   dev: get("/dev"),
   schema: get("/schema/gamecenter.json"),
@@ -22,6 +23,9 @@ export const routes = route({
   internalSession: post("/api/internal/session"),
   internalGames: get("/api/internal/games"),
   internalGamesRegister: post("/api/internal/games"),
+  internalHandle: post("/api/internal/handle"),
+  internalApprove: post("/api/internal/registrations/:id"),
+  internalDismiss: del("/api/internal/registrations/:id"),
   internalLaunch: post("/api/internal/launch"),
   internalClaim: post("/api/internal/claim"),
   internalMeAchievements: get("/api/internal/me/achievements"),

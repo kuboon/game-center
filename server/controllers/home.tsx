@@ -9,14 +9,14 @@
 import type { Action } from "@remix-run/fetch-router";
 
 import { getDb } from "../db/client.ts";
-import { type Game, listGames } from "../db/games.ts";
+import { type GameWithAuthor, listGamesWithAuthors } from "../db/games.ts";
 import { routes } from "../routes.ts";
 import { renderPage } from "../utils/render.tsx";
 
 export const homeAction = {
   async handler(context) {
     const client = getDb();
-    const games = client ? await listGames(client) : [];
+    const games = client ? await listGamesWithAuthors(client) : [];
 
     return renderPage(
       context,
@@ -60,14 +60,17 @@ export const homeAction = {
  * handle and return a render function, which is more machinery than a piece of
  * static markup needs.
  */
-function gameCard(game: Game) {
+function gameCard(game: GameWithAuthor) {
   return (
     <li key={game.id} class="card card-border bg-base-100">
       <div class="card-body">
         <h2 class="card-title">
           <a
             class="link link-hover"
-            href={routes.game.href({ id: game.id })}
+            href={routes.game.href({
+              handle: game.authorHandle ?? "",
+              slug: game.slug,
+            })}
             rmx-target="content"
           >
             {game.title}
@@ -75,7 +78,17 @@ function gameCard(game: Game) {
         </h2>
         {game.description ? <p class="text-sm">{game.description}</p> : null}
         <p class="text-sm opacity-70">
-          <code>{game.id}</code>
+          {game.authorHandle
+            ? (
+              <a
+                class="link"
+                href={routes.author.href({ handle: game.authorHandle })}
+                rmx-target="content"
+              >
+                @{game.authorHandle}
+              </a>
+            )
+            : game.authorName}
         </p>
       </div>
     </li>

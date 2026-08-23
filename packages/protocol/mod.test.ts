@@ -3,7 +3,9 @@ import { assert, assertEquals } from "@std/assert";
 import {
   extractManifestScript,
   formatIssues,
+  gameRef,
   MANIFEST_SCRIPT_TYPE,
+  parseGameRef,
   parseManifest,
   parseManifestText,
   type ParseResult,
@@ -12,6 +14,7 @@ import {
 /** A manifest with everything filled in, as a base for the invalid cases. */
 const valid = () => ({
   id: "my-puzzle",
+  author: "kuboon",
   title: "My Puzzle",
   description: "3分で遊べるパズル",
   url: "https://example.github.io/my-puzzle/",
@@ -73,7 +76,12 @@ Deno.test("rejects anything that is not an object", () => {
 
 Deno.test("reports every missing required field at once", () => {
   const result = parseManifest({});
-  assertEquals(paths(result).sort(), ["achievements", "id", "title"]);
+  assertEquals(paths(result).sort(), [
+    "achievements",
+    "author",
+    "id",
+    "title",
+  ]);
 });
 
 Deno.test("accepts a manifest with no url, since its location is its url", () => {
@@ -104,6 +112,16 @@ Deno.test("rejects a slug that would not survive a URL", () => {
       paths(parseManifest({ ...valid(), id })),
       ["id"],
       `accepted: ${id}`,
+    );
+  }
+});
+
+Deno.test("rejects an author that is not a handle", () => {
+  for (const author of ["Kuboon", "ku boon", "-lead", "trail-", "ab", "作者"]) {
+    assertEquals(
+      paths(parseManifest({ ...valid(), author })),
+      ["author"],
+      `accepted: ${author}`,
     );
   }
 });
@@ -170,7 +188,7 @@ Deno.test("formats issues one per line, with the field first", () => {
   const result = parseManifest({});
   assert(!result.ok);
   const text = formatIssues(result.issues);
-  assertEquals(text.split("\n").length, 3);
+  assertEquals(text.split("\n").length, 4);
   assert(text.includes("id: is required"), text);
 });
 
@@ -223,4 +241,30 @@ Deno.test("ends the script where a browser would", () => {
     `<script type="${MANIFEST_SCRIPT_TYPE}">{"title":"a<\\/script>b"}</script><p>after`;
   const text = extractManifestScript(html);
   assertEquals(text, '{"title":"a<\\/script>b"}');
+});
+
+Deno.test("a game's full name is its author and its slug", () => {
+  assertEquals(gameRef("kuboon", "my-puzzle"), "kuboon/my-puzzle");
+  assertEquals(parseGameRef("kuboon/my-puzzle"), {
+    author: "kuboon",
+    slug: "my-puzzle",
+  });
+  // The leading @ is how it is written in a URL.
+  assertEquals(parseGameRef("@kuboon/my-puzzle")?.author, "kuboon");
+});
+
+Deno.test("refuses a reference that is not one", () => {
+  for (
+    const ref of [
+      "my-puzzle",
+      "kuboon/",
+      "/my-puzzle",
+      "kuboon/my-puzzle/extra",
+      "Kuboon/my-puzzle",
+      "kuboon/My-Puzzle",
+      "",
+    ]
+  ) {
+    assertEquals(parseGameRef(ref), null, `accepted: ${ref}`);
+  }
 });
