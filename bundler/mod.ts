@@ -17,5 +17,10 @@ if (import.meta.main) {
   ]);
   console.log("[bundler] js complete", js);
   console.log("[bundler] css complete", css);
-  console.log("[bundler] llms.txt complete", llms);
+  // Not the whole `llms`: it carries the assembled text, for the tests to read
+  // without a build. Logging it buries every other line of the build log.
+  console.log("[bundler] llms.txt complete", {
+    output: llms.output,
+    bytes: llms.bytes,
+  });
 }
