@@ -234,3 +234,13 @@ Deno.test("the internal API keeps CORS off, even next to the game API", async ()
   assertEquals(response.status, 401);
   assertEquals(response.headers.get("access-control-allow-origin"), null);
 });
+
+Deno.test("GET /play/... says so when the game is unknown", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/play/@kuboon/nope", {
+      headers: { "rmx-frame": "1" },
+    }),
+  );
+  assertEquals(response.status, 200);
+  assertStringIncludes(await response.text(), "ゲームが見つかりません");
+});

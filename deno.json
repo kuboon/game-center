@@ -6,7 +6,8 @@
     "./tests",
     "./packages/session_storage_kv",
     "./packages/dpop_session_middleware",
-    "./packages/protocol"
+    "./packages/protocol",
+    "./packages/sdk"
   ],
   "tasks": {
     "dev": "deno task --cwd server dev",

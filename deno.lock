@@ -527,6 +527,11 @@
           "jsr:@std/assert@^1.0.19"
         ]
       },
+      "packages/sdk": {
+        "dependencies": [
+          "jsr:@std/assert@^1.0.19"
+        ]
+      },
       "packages/session_storage_kv": {
         "dependencies": [
           "jsr:@kuboon/kv@0.2",

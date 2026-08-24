@@ -49,15 +49,29 @@ type がブラウザの知らない値なので、ゲームの動作には影響
 - "url" は書きません。マニフェストが置かれている場所がゲームの場所です
 - 実績は好きなだけ足せます。"hidden": true にすると解除まで内容が伏せられます
 
-## 2. 実績が解除されたら、リンクを出す
+## 2. 実績を解除する
 
-実績を達成したとき、次の URL を開くリンクをプレイヤーに見せてください。
-勝手に window.open せず、押せるリンクとして出すこと (ポップアップブロック対策)。
+SDK を使う場合 (推奨。ハブ経由で起動されたときは自動で即時記録になります):
+
+import { GameCenter } from "https://esm.sh/jsr/@kuboon/game-center-sdk";
+
+const gc = GameCenter.init({ gameId: "${handle}/<id>" });
+
+const result = await gc.unlock("first_clear");
+if (!result.recorded) {
+  // 記録にはプレイヤーの確認が要る。リンクを画面に出す
+  document.body.appendChild(gc.claimLink("first_clear"));
+}
+
+外部スクリプトを読み込めない場合 (Claude Artifacts など) は、SDK を使わずに
+次の URL を開くリンクを出すだけでも動きます。
 
 https://ga-cen.kbn.one/claim/@${handle}/<id>/<achievement key>
 
 スコアを付けるなら ?score=1200 を足します。
-遷移先でプレイヤーが確認すると記録されます。
+
+どちらの場合も、**勝手に window.open しないでください。**
+押せるリンクとして出すこと (ポップアップブロック対策と、プレイヤーの意思確認)。
 
 ## 3. 登録
 

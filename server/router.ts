@@ -31,6 +31,7 @@ import { claimPageAction } from "./controllers/claim.tsx";
 import { devAction } from "./controllers/dev.tsx";
 import { authorPageAction } from "./controllers/author.tsx";
 import { gamePageAction } from "./controllers/game.tsx";
+import { playPageAction } from "./controllers/play.tsx";
 import { homeAction } from "./controllers/home.tsx";
 import { meAction } from "./controllers/me.tsx";
 import { schemaAction } from "./controllers/schema.ts";
@@ -53,6 +54,7 @@ const router = createRouter({ middleware: [serveBundled, gameCors, dpop] });
 
 router.get(routes.home, homeAction);
 router.get(routes.game, gamePageAction);
+router.get(routes.play, playPageAction);
 router.get(routes.claim, claimPageAction);
 router.get(routes.author, authorPageAction);
 router.get(routes.me, meAction);

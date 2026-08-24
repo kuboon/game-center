@@ -154,6 +154,23 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 `/me` の「ゲームを作る AI に渡す」は、作者 ID を埋め込んだ手順一式を
 クリップボードに入れる。識別子を手で写させないため
 
+## SDK
+
+`packages/sdk`
+は依存ゼロの単一ファイル。**コピペできる大きさに保つこと自体が仕様** (Artifacts
+は外部スクリプトを読めない)。
+
+- `unlock()` は postMessage → REST → claim URL の順に落ちる。**例外を投げず、
+  勝手に遷移しない**。`recorded` が false なら `claimUrl` を返すので、
+  呼び出し側が `claimLink()` でリンクを出す
+- 起動トークンはフラグメントから読んで localStorage に入れ、アドレスバーから
+  消す。401 が返ったら捨てる(以後成功しえないリクエストを待たないため)
+- `lib` はブラウザのものだけ。ゲームに同梱されるファイルに Deno の API が
+  紛れないようにする。`deno.ns` を参照するのはテストだけ
+- `/play/@{author}/{slug}` が postMessage の親。**`event.origin` が登録済み
+  ゲームの origin と一致することを確かめてから他の何もしない**。その origin は
+  メッセージではなく SSR された登録内容から来る
+
 ## 実績解除
 
 解除は3モードあるが、サーバ側の入口は2つ。ゲームからの REST
