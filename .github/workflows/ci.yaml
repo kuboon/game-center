@@ -31,13 +31,32 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           edited=$(git diff --name-only --diff-filter=MDR "$BASE"...HEAD -- db/migrations/)
-          if [ -n "$edited" ]; then
-            echo "These migrations already exist on the base branch:"
-            echo "$edited" | sed 's/^/  /'
-            echo
-            echo "Editing one breaks any database that has already applied it"
-            echo "(Migration checksum drift detected ...). Add a new migration"
-            echo "that corrects the old one instead. See db/README.md."
-            exit 1
+          if [ -z "$edited" ]; then
+            echo "No migration on the base branch was touched."
+            exit 0
           fi
-          echo "No migration on the base branch was touched."
+
+          echo "These migrations already exist on the base branch:"
+          echo "$edited" | sed 's/^/  /'
+          echo
+
+          # Rewriting the whole set is a real thing to want, exactly once, while
+          # every database that has applied them can still be thrown away. It
+          # has to be said out loud in a commit message, because the cost is
+          # paid by whoever forgets to rebuild those databases.
+          reason=$(git log --format=%B "$BASE"..HEAD | sed -n 's/^Migrations-Reset:[[:space:]]*//p' | head -1)
+          if [ -n "$reason" ]; then
+            echo "Allowed by a Migrations-Reset trailer: $reason"
+            echo
+            echo "Every database that has applied these must be rebuilt, or its"
+            echo "next migrate will stop at 'drifted' / 'missing'."
+            exit 0
+          fi
+
+          echo "Editing one breaks any database that has already applied it"
+          echo "(Migration checksum drift detected ...). Add a new migration"
+          echo "that corrects the old one instead. See db/README.md."
+          echo
+          echo "If you really mean to rewrite the set, say so in a commit:"
+          echo "  Migrations-Reset: <why, and which databases you will rebuild>"
+          exit 1
