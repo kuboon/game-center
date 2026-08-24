@@ -13,3 +13,31 @@ jobs:
       - uses: denoland/setup-deno@v2
       - run: deno task check
       - run: deno task test
+
+  # A migration that has been applied cannot be edited: the runner records a
+  # checksum for each one and refuses to continue when the file changes
+  # underneath it. The tests never catch this, because they build a database
+  # from nothing every time — so CI goes green and only the deploy turns red.
+  # This job is the part that notices.
+  migrations:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Refuse edits to migrations already on the base branch
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          edited=$(git diff --name-only --diff-filter=MDR "$BASE"...HEAD -- db/migrations/)
+          if [ -n "$edited" ]; then
+            echo "These migrations already exist on the base branch:"
+            echo "$edited" | sed 's/^/  /'
+            echo
+            echo "Editing one breaks any database that has already applied it"
+            echo "(Migration checksum drift detected ...). Add a new migration"
+            echo "that corrects the old one instead. See db/README.md."
+            exit 1
+          fi
+          echo "No migration on the base branch was touched."

@@ -58,6 +58,25 @@ Deno.test("migrate creates every table the design declares", async () => {
   });
 });
 
+Deno.test("seeding is safe to repeat, and reset rebuilds from nothing", async () => {
+  await withDb(async (url, client) => {
+    assertOk(await runDb(url, "migrate"), "migrate");
+    assertOk(await runDb(url, "seed"), "seed");
+    assertOk(await runDb(url, "seed"), "second seed");
+
+    // Every insert ignores a row that is already there, so a second run
+    // neither duplicates nor fails.
+    const games = await client.execute("select count(*) as n from games");
+    assertEquals(Number(games.rows[0].n), 1);
+
+    // wipe + migrate + seed, in one command.
+    assertOk(await runDb(url, "reset", "--force"), "reset");
+    assert((await tableNames(client)).includes("games"));
+    const after = await client.execute("select count(*) as n from games");
+    assertEquals(Number(after.rows[0].n), 1);
+  });
+});
+
 Deno.test("migrate is a no-op once applied", async () => {
   await withDb(async (url) => {
     assertOk(await runDb(url, "migrate"), "migrate");

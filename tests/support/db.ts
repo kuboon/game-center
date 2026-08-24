@@ -1,10 +1,11 @@
 /**
  * Throwaway databases for the `-A` tests.
  *
- * Migrations are applied by spawning `deno task db`'s CLI, so what the tests
- * run against is the schema the deploy produces rather than a copy of it.
+ * The tests run `deno task db` itself rather than importing the runner, so what
+ * they exercise is the command a deploy runs — including the version of it that
+ * `deno.json` pins. Pinning it a second time here is how the two would drift.
  *
- * A file-backed database rather than `:memory:`, because the CLI is a separate
+ * A file-backed database rather than `:memory:`, because the task is a separate
  * process from the client the test holds — an in-memory database could not be
  * shared between them.
  */
@@ -14,8 +15,9 @@ import { type Client, createClient } from "@libsql/client/node";
 
 export type { Client };
 
-const CLI = "jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0/cli";
+const ROOT = new URL("../../", import.meta.url).pathname;
 const MIGRATIONS = new URL("../../db/migrations", import.meta.url).pathname;
+const SEED = new URL("../../db/seed.sql", import.meta.url).pathname;
 
 export interface CliResult {
   readonly code: number;
@@ -23,13 +25,25 @@ export interface CliResult {
   readonly stderr: string;
 }
 
-/** Run one migration CLI command against `url`, as `deno task db` does. */
+/** Run one `deno task db` command against `url`. */
 export async function runDb(
   url: string,
   ...args: string[]
 ): Promise<CliResult> {
   const command = new Deno.Command(Deno.execPath(), {
-    args: ["run", "-A", CLI, ...args, "--url", url, "--migrations", MIGRATIONS],
+    args: [
+      "task",
+      "--cwd",
+      ROOT,
+      "db",
+      ...args,
+      "--url",
+      url,
+      "--migrations",
+      MIGRATIONS,
+      "--seed",
+      SEED,
+    ],
     stdout: "piped",
     stderr: "piped",
   });

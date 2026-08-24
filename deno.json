@@ -12,8 +12,8 @@
     "dev": "deno task --cwd server dev",
     "serve": "deno task --cwd server serve",
     "bundle": "deno task --cwd bundler build",
-    "db": "deno run -A jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0/cli",
-    "migrate": "deno task db migrate",
+    "db": "deno run -A db/cli.ts",
+    "migrate": "deno run -A db/migrate.ts",
     "keygen": "deno run server/scripts/keygen.ts",
     "test": "deno test -P --ignore=tests && deno task --cwd tests test",
     "check": "deno check && deno lint && deno fmt --check"
@@ -45,6 +45,8 @@
   },
   "imports": {
     "daisyui": "npm:daisyui@^5.5.19",
-    "tailwindcss": "npm:tailwindcss@^4.1.18"
+    "tailwindcss": "npm:tailwindcss@^4.1.18",
+    "@kuboon/remix-data-table-sqlite-turso": "jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0",
+    "@std/assert": "jsr:@std/assert@^1.0.19"
   }
 }
