@@ -510,9 +510,12 @@ Action がすることは「この URL を読み直せ」とハブに伝える�
 
 ゲーム開発者の多くは LLM なので、「LLM が一度読めば正しく組み込める」文書を成果物として扱う。
 
-- **`/llms.txt`**：プロトコル全体、SDK 全文(コピペ用)、gamecenter.json の例、登録手順を1ファイルに収めたもの。docs から生成してハブサイトで配信する
-- **Claude skill**：`skills/game-center/SKILL.md`。トリガー条件(「game-center に対応させたい」等)と、llms.txt と同内容の手順を含む
-- **`docs/protocol.md`**：人間の開発者向けの正式仕様。llms.txt はここから生成し、二重管理しない
+- **`docs/protocol.md`**：正式仕様。これが正本である
+- **`/llms.txt`**：`docs/protocol.md` と `packages/sdk/mod.ts` から `bundler/llms.ts` が生成する。仕様全文、SDK 全文、最小の実例が一つに入る。ビルド成果物なので `bundled/` に出て、`staticFiles` がそのまま配信する
+- **Claude skill**：`skills/game-center/SKILL.md`。トリガー条件と手順、そして「まず作者 ID をユーザに聞く」
+
+生成にするのは、仕様を書き写したファイルがいずれ仕様と食い違うからである。
+一つに収めるのは、四つのページを取りに行かせるとどれかを読み落とすからである。
 
 ## ディレクトリ構成
 

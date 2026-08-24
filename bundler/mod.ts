@@ -5,11 +5,17 @@
 
 import { buildCss } from "./css.ts";
 import { buildJs } from "./js.ts";
+import { buildLlmsTxt } from "./llms.ts";
 
-export { buildCss, buildJs };
+export { buildCss, buildJs, buildLlmsTxt };
 
 if (import.meta.main) {
-  const [js, css] = await Promise.all([buildJs(), buildCss()]);
+  const [js, css, llms] = await Promise.all([
+    buildJs(),
+    buildCss(),
+    buildLlmsTxt(),
+  ]);
   console.log("[bundler] js complete", js);
   console.log("[bundler] css complete", css);
+  console.log("[bundler] llms.txt complete", llms);
 }

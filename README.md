@@ -6,7 +6,8 @@ Claude Artifacts で公開される。
 このリポジトリはハブサイト、通信プロトコル、開発者向けドキュメント(llms.txt /
 skill)、ゲーム自動登録用の GitHub Action を提供する。
 
-設計の全体像は [docs/grand_design.md](docs/grand_design.md) を参照。
+設計の全体像は [docs/grand_design.md](docs/grand_design.md)、
+ゲームを対応させる手順は [docs/protocol.md](docs/protocol.md) を参照。
 
 ## Stack
 

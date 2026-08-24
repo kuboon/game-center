@@ -25,6 +25,9 @@ Deno workspace。
 - `bundler/` — `Deno.bundle` による JS ビルドと Tailwind CSS ビルド。出力は
   `bundled/`(git 管理外)
 - `assets/style.css` — Tailwind v4 + daisyUI の入力 CSS
+- `packages/sdk` — ゲームに同梱する SDK。単一ファイル、依存ゼロ
+- `action/` — ゲーム登録用の composite action。secret を取らない
+- `skills/game-center/SKILL.md` — ゲームを作る LLM 向けの skill
 - `tests/` — FFI 権限が要るテスト(ローカル SQLite
   に対するマイグレーション検証)。詳細は [tests/README.md](tests/README.md)
 
@@ -191,6 +194,20 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - `/api/game/v1/*` だけ CORS を全開放する(`server/middleware/game_cors.ts`)。
   Cookie を使わずヘッダのトークンで認証するので開放してよい。エラー応答にも
   ヘッダを付ける。付けないとゲームが 401 を読めず claim URL に落ちられない
+
+## LLM 向け提供物
+
+ゲームを作るのはたいてい LLM
+なので、**一度読めば正しく組み込める**ことを成果物の 条件にする。
+
+- `docs/protocol.md` が正本。`/llms.txt` は `bundler/llms.ts` がそこと
+  `packages/sdk/mod.ts` から**生成**する。仕様を書き写したファイルは、いずれ
+  仕様と食い違う
+- `/llms.txt` は仕様・SDK 全文・最小の実例を一つに収める。四つのページを取りに
+  行かせると、どれかを読み落とす
+- `skills/game-center/SKILL.md` は「まず作者 ID をユーザに聞く」から始まる。
+  不透明な識別子なので推測させない
+- `skills/` は `docs/` と同じく `deno fmt` の対象外(一文一行を保つため)
 
 ## 規約
 

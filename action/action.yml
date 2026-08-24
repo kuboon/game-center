@@ -1,0 +1,71 @@
+name: Register with game-center
+description: >-
+  Tell game-center to re-read a game's gamecenter.json. No secret: the hub reads
+  the document itself, and where it was served from is what decides whether it
+  may write.
+
+inputs:
+  url:
+    description: The game's page URL, where its manifest lives.
+    required: true
+  hub:
+    description: Override for a development hub.
+    required: false
+    default: https://ga-cen.kbn.one
+
+outputs:
+  status:
+    description: registered, updated, or pending
+    value: ${{ steps.register.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    - id: register
+      shell: bash
+      env:
+        URL: ${{ inputs.url }}
+        HUB: ${{ inputs.hub }}
+      run: |
+        set -euo pipefail
+
+        # There is nothing to authenticate. The call asks the hub to read a
+        # document its author already published; the document's location is
+        # what vouches for it.
+        body=$(mktemp)
+        code=$(curl -sS -o "$body" -w '%{http_code}' \
+          -X POST "$HUB/api/registry/v1/games" \
+          -H 'content-type: application/json' \
+          -d "$(printf '{"url":%s}' "$(printf '%s' "$URL" | jq -Rs .)")")
+
+        case "$code" in
+          201)
+            echo "status=registered" >> "$GITHUB_OUTPUT"
+            echo "::notice::Registered $(jq -r '.game.id' "$body")"
+            ;;
+          200)
+            echo "status=updated" >> "$GITHUB_OUTPUT"
+            echo "::notice::Updated $(jq -r '.game.id' "$body")"
+            ;;
+          202)
+            # Not a failure. The first push of a new game waits for its author
+            # to approve the URL once; every push after that goes straight
+            # through. Failing here would make every new game's first CI run
+            # red for a reason nothing is wrong with.
+            echo "status=pending" >> "$GITHUB_OUTPUT"
+            echo "::notice::$(jq -r '.message' "$body")"
+            ;;
+          400)
+            echo "::error::gamecenter.json is not valid"
+            # Every problem, not just the first — one CI run should tell you
+            # everything to fix.
+            jq -r '.message // .error' "$body" | while read -r line; do
+              echo "::error::$line"
+            done
+            exit 1
+            ;;
+          *)
+            echo "::error::$HUB answered $code: $(jq -r '.error // .' "$body")"
+            exit 1
+            ;;
+        esac
