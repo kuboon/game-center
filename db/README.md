@@ -69,6 +69,76 @@ libSQL は素の SQLite と違って外部キーを既定で有効にする。
 `data_table_migrations` が「適用済み」の唯一の記録なので、名前を変えると全部が
 `pending` に戻り、次の `migrate` が既にあるテーブルを作り直そうとして落ちる。
 
+## デプロイと環境
+
+Deno Deploy の pre-deploy が `deno task migrate` を走らせる。
+これは**プレビューを含む全デプロイで走る**ので、そのコンテキストの
+`TURSO_DATABASE_URL` が指す DB に適用される。
+環境変数はコンテキストごとに分かれ、ビルド用はランタイムとも別に持てる。
+
+| コンテキスト | `TURSO_DATABASE_URL` | `PREVIEW_DATABASE` |
+| ------------ | -------------------- | ------------------ |
+| Build        | プレビュー DB        | `1`                |
+| Development  | プレビュー DB        | `1`                |
+| Production   | 本番                 | 設定しない         |
+
+`TURSO_AUTH_TOKEN` は同じグループならグループトークン一つで両方に通る。
+
+`deno task db` は薄い包み(`db/cli.ts`)を通る。 足しているのは「どの DB
+に対して何をするか」を実行前に一行出すことだけ。 どの DB
+を触ったのか誰も言わないまま事故が起きたので付けた。
+
+### プレビュー DB は本番から切り直す
+
+マイグレーションについて本当に知りたいのは「**本番の実データに耐えるか**」である。
+そしてそれを試している場所が他に無い。 CI は毎回まっさらな DB
+を作るので、空のテーブルに対して当てているだけで、`reset --force`
+で建て直しても同じことしか分からない。
+
+これは机上の話ではない。 このリポジトリの `20260821120000`
+はテストを全部通したうえで、行が一つ入ったテーブルに対して外部キーで落ちた。
+主キーは、行が参照している間は振り直せないからである。
+
+そこで `deno task migrate`(`db/migrate.ts`)は、プレビューのとき
+**本番から切り直した DB** に対して migrate する。
+
+```
+delete  https://api.turso.tech/v1/organizations/{org}/databases/{preview}
+create  https://api.turso.tech/v1/organizations/{org}/databases
+        { name, group, seed: { type: "database", name: "{source}" } }
+```
+
+未マージのマイグレーションを直したときの drift も、これで自然に消える。 DB
+が毎回新しいので、drift のしようがない。
+
+必要な環境変数(Build コンテキスト)。
+
+| 変数                    | 内容                                                           |
+| ----------------------- | -------------------------------------------------------------- |
+| `TURSO_PLATFORM_TOKEN`  | Platform API のトークン。**DB を削除できる**ので範囲を絞ること |
+| `TURSO_ORG`             | 組織スラッグ                                                   |
+| `TURSO_SOURCE_DATABASE` | 複製元、つまり本番の DB 名                                     |
+| `TURSO_GROUP`           | 省略時 `default`                                               |
+
+プレビュー DB の**名前は指定しない**。`TURSO_DATABASE_URL` から導出する。 一つの
+DB に二つの名前を持たせることが、間違ったほうを消す原因になる。
+
+### 壊してよい条件
+
+破壊的な経路(切り直しと
+`reset --force`)は、独立した二つの条件が揃ったときだけ動く。
+
+- `DENO_TIMELINE` が `production` でない
+- `PREVIEW_DATABASE=1` が設定されている
+
+後者を URL と同じコンテキストに置くのは、**URL
+の配線ミスだけがこれらを致命的にする**からである。 加えて、導出したプレビュー DB
+名が `TURSO_SOURCE_DATABASE` と一致したら設定ミスとして停止する。
+
+`PREVIEW_DATABASE` が無ければ `deno task migrate` は `db migrate`
+そのもので、何も壊さない。 切り直しの設定が無いプレビューでは、migrate
+に失敗したときだけ `reset --force` で建て直す。
+
 ## テスト
 
 `tests/` のテストは `deno task db` を実際に起動して、使い捨ての file DB
