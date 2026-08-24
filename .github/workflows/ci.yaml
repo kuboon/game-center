@@ -12,6 +12,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: denoland/setup-deno@v2
       - run: deno task check
+      - run: deno task bundle
       - run: deno task test
 
   # A migration that has been applied cannot be edited: the runner records a

@@ -89,12 +89,12 @@ curl -X POST https://ga-cen.kbn.one/api/registry/v1/games \\\\
 /**
  * Assemble the file.
  *
- * @param write Set false to get the text back without touching the filesystem
- * @returns The path written and the size, or the text when not writing
+ * @param write Set false to assemble without touching the filesystem
+ * @returns The assembled text, and where it was written
  */
 export async function buildLlmsTxt(
   { write = true }: { write?: boolean } = {},
-): Promise<{ output: string; bytes: number }> {
+): Promise<{ output: string; bytes: number; text: string }> {
   const protocol = await Deno.readTextFile(new URL("docs/protocol.md", ROOT));
   const sdk = await Deno.readTextFile(
     new URL("packages/sdk/mod.ts", ROOT),
@@ -113,5 +113,5 @@ export async function buildLlmsTxt(
     await Deno.mkdir(new URL("bundled/", ROOT), { recursive: true });
     await Deno.writeTextFile(OUTPUT, text);
   }
-  return { output: OUTPUT.pathname, bytes: text.length };
+  return { output: OUTPUT.pathname, bytes: text.length, text };
 }

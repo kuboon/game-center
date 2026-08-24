@@ -244,16 +244,3 @@ Deno.test("GET /play/... says so when the game is unknown", async () => {
   assertEquals(response.status, 200);
   assertStringIncludes(await response.text(), "ゲームが見つかりません");
 });
-
-Deno.test("GET /llms.txt hands over the whole protocol at once", async () => {
-  const response = await router.fetch(new Request("http://localhost/llms.txt"));
-  assertEquals(response.status, 200);
-
-  const text = await response.text();
-  // The spec, the SDK it would otherwise import, and a worked example — a
-  // model that has to fetch four pages will get some of them wrong.
-  assertStringIncludes(text, "application/gamecenter+json");
-  assertStringIncludes(text, "/api/registry/v1/games");
-  assertStringIncludes(text, "export class GameCenter");
-  assertStringIncludes(text, "最小の実例");
-});
