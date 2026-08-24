@@ -35,7 +35,7 @@ deno task dev     # bundle してから開発サーバ起動 (http://localhost:8
 deno task test    # テスト (-P の単体テスト + tests/ の -A テスト)
 deno task check   # deno check + lint + fmt --check
 deno task migrate # 未適用のマイグレーションを Turso に適用
-deno task db …   # migrate / rollback / status / seed / reset / wipe
+deno task db …    # migrate / rollback / status / seed / reset / wipe
 ```
 
 `bundled/` は `deno task bundle` で生成する。 サーバは起動時にこれを
@@ -48,20 +48,18 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 
 - サーバ本体は `@libsql/client/web`(fetch
   ベース)を使う。ネイティブアドオンを読み込まないので Deno Deploy で動く
-- マイグレーションは
-  [remix-db-migrations-deno](https://github.com/kuboon/kuboon-remix-utils/tree/main/plugins/remix-db-migrations-deno)
-  の規約に従う。`remix db` は remix.json が Turso
-  アダプタを表現できないため使えず、 代わりに
-  `@kuboon/remix-data-table-sqlite-turso/cli` を `deno task db` で叩く
-- スキーマ変更は `db/migrations/` に `YYYYMMDDHHmmss_name/` ディレクトリを作り、
-  `up.sql` と(戻せる変更なら)`down.sql` を置く。名前は14桁の数字 + `_` +
-  名前で、 外れると全体がエラーになる
-- 適用状況は `data_table_migrations` テーブルが持つ。テーブル名を変えると
-  適用済みのマイグレーションが再実行される
+- マイグレーションの手順・規約・踏んだ罠は [db/README.md](db/README.md)
+  にまとめてある。スキーマを触る前に読むこと
+- **適用済みのマイグレーションは書き換えない**。ランナーがチェックサムを
+  持っているので `drifted` で止まる。テストは毎回まっさらな DB を作るので
+  気づけず、デプロイだけが赤くなる。CI の `migrations` ジョブが見張っている
+- **マイグレーションの中で外部キーは切れない**。ランナーがトランザクションで
+  包むため `pragma foreign_keys` も `defer_foreign_keys` も効かない。行の入った
+  テーブルは作り直せないので、主キーを振り直す変更は子ごと消すことになる
 - マイグレーションはデプロイ手順の一段として `deno task migrate`
   で適用する。起動時には適用しない(Deno Deploy では isolate ごとに競合するため)
-- libSQL は外部キーを既定で有効にする。参照先を作り直すマイグレーションでは
-  自分で無効化する必要がある
+- CLI のバージョンは `deno.json` の `imports` で一度だけ固定する。
+  `tests/support/db.ts` は `deno task db` を起動するので、そこには書かない
 
 ## 認証
 

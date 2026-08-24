@@ -493,6 +493,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@kuboon/remix-data-table-sqlite-turso@0.3",
       "npm:daisyui@^5.5.19",
       "npm:tailwindcss@^4.1.18"
     ],
