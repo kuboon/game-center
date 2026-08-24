@@ -58,6 +58,12 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   テーブルは作り直せないので、主キーを振り直す変更は子ごと消すことになる
 - マイグレーションはデプロイ手順の一段として `deno task migrate`
   で適用する。起動時には適用しない(Deno Deploy では isolate ごとに競合するため)
+- **pre-deploy はプレビューでも走る**。コンテキストごとに `TURSO_DATABASE_URL`
+  を分け、Build と Development はプレビュー DB を指す
+- プレビュー DB は作り直すもの。未マージのマイグレーションを直すと drift
+  するので、`deno task migrate` は捨ててよい DB なら `reset --force`
+  で建て直す。条件は `DENO_TIMELINE != production` かつ `PREVIEW_DATABASE=1`
+  の両方(`db/migrate.ts`)
 - CLI のバージョンは `deno.json` の `imports` で一度だけ固定する。
   `tests/support/db.ts` は `deno task db` を起動するので、そこには書かない
 
