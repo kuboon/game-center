@@ -494,6 +494,7 @@
   "workspace": {
     "dependencies": [
       "jsr:@kuboon/remix-data-table-sqlite-turso@0.3",
+      "jsr:@std/assert@^1.0.19",
       "npm:daisyui@^5.5.19",
       "npm:tailwindcss@^4.1.18"
     ],

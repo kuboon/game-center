@@ -46,6 +46,7 @@
   "imports": {
     "daisyui": "npm:daisyui@^5.5.19",
     "tailwindcss": "npm:tailwindcss@^4.1.18",
-    "@kuboon/remix-data-table-sqlite-turso": "jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0"
+    "@kuboon/remix-data-table-sqlite-turso": "jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0",
+    "@std/assert": "jsr:@std/assert@^1.0.19"
   }
 }
