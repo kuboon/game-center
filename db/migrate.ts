@@ -44,12 +44,23 @@ async function run(...args: string[]): Promise<number> {
 }
 
 if (disposable) {
+  // Not caught: readBranchConfig only throws when the preview database resolves
+  // to production's name, and there is no safe way to continue from that — the
+  // next two steps would migrate production and then reset it.
   const branch = readBranchConfig(Deno.env);
   if (branch) {
     console.log(
       `[db] rebranching ${branch.preview} from ${branch.source} (${timeline})`,
     );
-    await rebuildPreviewBranch(branch);
+    try {
+      await rebuildPreviewBranch(branch);
+    } catch (error) {
+      // Turso was unreachable, or the token cannot do this. The preview loses
+      // production's rows and so proves less than it should, which is worth
+      // saying out loud — but it is not worth blocking every preview on, and
+      // the two steps below still reach a migrated database either way.
+      console.error(`[db] could not rebranch: ${(error as Error).message}`);
+    }
   } else {
     console.log(`[db] no branch configuration; migrating in place`);
   }
