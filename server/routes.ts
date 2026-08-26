@@ -29,6 +29,9 @@ export const routes = route({
   internalLaunch: post("/api/internal/launch"),
   internalClaim: post("/api/internal/claim"),
   internalMeAchievements: get("/api/internal/me/achievements"),
+  internalFollow: post("/api/internal/follows"),
+  internalUnfollow: del("/api/internal/follows/@:handle"),
+  internalFollowState: get("/api/internal/follows/@:handle"),
 
   gameUnlock: post("/api/game/v1/unlock"),
   gameMe: get("/api/game/v1/me"),
