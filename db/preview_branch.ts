@@ -36,9 +36,11 @@ export interface BranchConfig {
 /**
  * Read the branch configuration from the environment.
  *
- * The preview database's name is derived from the URL already configured for
- * this context, rather than named a second time — two names for one database is
- * how the wrong one gets deleted.
+ * The preview database's name is derived from `PREVIEW_DATABASE_URL`, the same
+ * variable the migration is pointed at, rather than named a second time — two
+ * names for one database is how the wrong one gets deleted. It is deliberately
+ * not `TURSO_DATABASE_URL`: that one names production during a production
+ * build, and nothing here may address production.
  *
  * @param env The environment to read
  * @returns The configuration, or null when this deployment should not rebrand
@@ -49,7 +51,7 @@ export function readBranchConfig(
   const token = env.get("TURSO_PLATFORM_TOKEN");
   const org = env.get("TURSO_ORG");
   const source = env.get("TURSO_SOURCE_DATABASE");
-  const url = env.get("TURSO_DATABASE_URL");
+  const url = env.get("PREVIEW_DATABASE_URL");
   if (!token || !org || !source || !url) return null;
 
   const preview = databaseName(url, org);
