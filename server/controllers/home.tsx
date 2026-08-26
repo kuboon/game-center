@@ -2,11 +2,18 @@
  * GET / — the catalog.
  *
  * Server-rendered from the game list, because a catalog is the same for
- * everyone and should be readable (and indexable) without JavaScript. Only the
- * 遊ぶ button on a game's page needs to know who is looking.
+ * everyone and should be readable (and indexable) without JavaScript.
+ *
+ * `CatalogSections` sits above it with the parts that are not the same for
+ * everyone: games by the people you follow, and games they are playing. Those
+ * need a DPoP proof, which SSR has no way to carry, so they arrive from the
+ * browser and render above this listing rather than reordering it. A visitor
+ * with no session, or no follows, simply sees the catalog.
  */
 
 import type { Action } from "@remix-run/fetch-router";
+
+import { CatalogSections } from "../../client/catalog_sections.tsx";
 
 import { getDb } from "../db/client.ts";
 import { type GameWithAuthor, listGamesWithAuthors } from "../db/games.ts";
@@ -28,6 +35,8 @@ export const homeAction = {
           など、サーバのない場所で動きます。
         </p>
 
+        <CatalogSections />
+
         {games.length === 0
           ? (
             <div class="card card-border bg-base-100">
@@ -44,9 +53,12 @@ export const homeAction = {
             </div>
           )
           : (
-            <ul class="grid gap-4 sm:grid-cols-2">
-              {games.map(gameCard)}
-            </ul>
+            <section class="space-y-3">
+              <h2 class="text-xl font-bold">すべてのゲーム</h2>
+              <ul class="grid gap-4 sm:grid-cols-2">
+                {games.map(gameCard)}
+              </ul>
+            </section>
           )}
       </main>,
     );
