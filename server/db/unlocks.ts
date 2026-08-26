@@ -28,6 +28,13 @@ export interface Unlock {
   readonly title: string;
   readonly description: string | null;
   readonly points: number;
+  /**
+   * Whether the manifest keeps this achievement's name secret until it is
+   * earned. Carried on the unlock because a profile page is public: the owner
+   * has earned the right to read the title, and a visitor reading their page
+   * has not.
+   */
+  readonly hidden: boolean;
   readonly unlockedAt: string;
   readonly score: number | null;
   readonly via: UnlockVia;
@@ -114,7 +121,8 @@ export async function unlockAchievement(
 
 const UNLOCK_COLUMNS = `select games.id as game_id, games.title as game_title,
          achievements.key, achievements.title, achievements.description,
-         achievements.points, user_achievements.unlocked_at,
+         achievements.points, achievements.hidden,
+         user_achievements.unlocked_at,
          user_achievements.score, user_achievements.via
     from user_achievements
     join achievements on achievements.id = user_achievements.achievement_id
@@ -190,6 +198,7 @@ function toUnlock(row: Record<string, unknown>): Unlock {
     title: String(row.title),
     description: row.description === null ? null : String(row.description),
     points: Number(row.points),
+    hidden: Number(row.hidden) === 1,
     unlockedAt: String(row.unlocked_at),
     score: row.score === null ? null : Number(row.score),
     via: String(row.via) as UnlockVia,

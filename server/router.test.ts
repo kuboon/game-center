@@ -244,3 +244,41 @@ Deno.test("GET /play/... says so when the game is unknown", async () => {
   assertEquals(response.status, 200);
   assertStringIncludes(await response.text(), "ゲームが見つかりません");
 });
+
+Deno.test("following anyone needs a session", async () => {
+  // All three, including the read: whether *you* follow someone is not a fact
+  // about them, so there is nobody to answer for without a proof.
+  const requests: Array<[string, RequestInit]> = [
+    ["/api/internal/follows", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handle: "kuboon" }),
+    }],
+    ["/api/internal/follows/@kuboon", { method: "DELETE" }],
+    ["/api/internal/follows/@kuboon", {}],
+  ];
+
+  for (const [path, init] of requests) {
+    const response = await router.fetch(
+      new Request(`http://localhost${path}`, init),
+    );
+    assertEquals(response.status, 401, `${init.method ?? "GET"} ${path}`);
+    // Not a 404: the route exists, and saying otherwise would make a wiring
+    // mistake look like an authentication one.
+    assertEquals(response.headers.get("cache-control"), "no-store");
+  }
+});
+
+Deno.test("the follow API stays same-origin, like the rest of /api/internal", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/internal/follows", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://example.github.io",
+      },
+      body: JSON.stringify({ handle: "kuboon" }),
+    }),
+  );
+  assertEquals(response.headers.get("access-control-allow-origin"), null);
+});

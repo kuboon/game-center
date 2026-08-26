@@ -26,7 +26,15 @@ import {
   withDb,
 } from "./support/db.ts";
 
-const LATEST_MIGRATION = "20260824000000";
+/**
+ * The first migration, which every later one sits on top of.
+ *
+ * Named rather than counted: `rollback --to` reverts back through a migration
+ * inclusive, so this unwinds the whole schema however many migrations exist by
+ * then. A `--step` count would have to be edited every time one is added, and
+ * would quietly stop testing what it claims to when somebody forgot.
+ */
+const FIRST_MIGRATION = "20260824000000_initial";
 
 Deno.test("migrate creates every table the design declares", async () => {
   await migratedDb(async (client) => {
@@ -38,6 +46,7 @@ Deno.test("migrate creates every table the design declares", async () => {
         "achievements",
         "user_achievements",
         "game_registrations",
+        "follows",
         "kv",
       ]
     ) {
@@ -81,10 +90,19 @@ Deno.test("migrate is a no-op once applied", async () => {
   await withDb(async (url) => {
     assertOk(await runDb(url, "migrate"), "migrate");
     assertOk(await runDb(url, "migrate"), "second migrate");
-    assertStringIncludes(
-      assertOk(await runDb(url, "status"), "status").stdout,
-      LATEST_MIGRATION,
-    );
+
+    // Asserted as "nothing is outstanding" rather than by naming a migration:
+    // that is what idempotent means here, and it keeps saying so as
+    // migrations are added.
+    const status = assertOk(await runDb(url, "status"), "status").stdout;
+    assertStringIncludes(status, "applied");
+    for (const outstanding of ["pending", "drifted", "missing"]) {
+      assertEquals(
+        status.includes(outstanding),
+        false,
+        `status reported ${outstanding}:\n${status}`,
+      );
+    }
   });
 });
 
@@ -93,7 +111,10 @@ Deno.test("rollback takes the schema back to nothing, and forward again", async 
     assertOk(await runDb(url, "migrate"), "migrate");
     assert((await tableNames(client)).includes("games"));
 
-    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback");
+    assertOk(
+      await runDb(url, "rollback", "--to", FIRST_MIGRATION),
+      "rollback",
+    );
     const bare = await tableNames(client);
     for (
       const table of [
@@ -102,6 +123,7 @@ Deno.test("rollback takes the schema back to nothing, and forward again", async 
         "achievements",
         "user_achievements",
         "game_registrations",
+        "follows",
         "kv",
       ]
     ) {
