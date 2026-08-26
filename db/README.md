@@ -89,14 +89,19 @@ context are available during builds, but variables from "Production" or
 本番のタイムラインなら `TURSO_DATABASE_URL`、それ以外なら
 `PREVIEW_DATABASE_URL`。 二つは Build コンテキストに並べて置く。
 
-| コンテキスト | `TURSO_DATABASE_URL` | `PREVIEW_DATABASE_URL` |
-| ------------ | -------------------- | ---------------------- |
-| Build        | 本番                 | プレビュー DB          |
-| Production   | 本番                 | 設定しない             |
-| Preview      | プレビュー DB        | 設定しない             |
+サーバも同じやり方で選ぶ(`server/config.ts`)。 コンテキストを分けても解決
+しないのは実行時も同じで、**同じ名前に二つの値は持てない**からである (`add`
+は必ず全コンテキストで作り、`update-contexts` は適用範囲を狭めるだけ)。
+だから両方の URL をどのコンテキストからも見えるようにしておき、 どちらを使うかは
+`DENO_TIMELINE` が決める。
 
-Build の二行だけが pre-deploy 用で、残りはサーバが実行時に読むものである。
-サーバは自分のコンテキストを読むので、そちらは素直に分ければよい。
+| 変数                   | 値            |
+| ---------------------- | ------------- |
+| `TURSO_DATABASE_URL`   | 本番          |
+| `PREVIEW_DATABASE_URL` | プレビュー DB |
+
+プレビューに `PREVIEW_DATABASE_URL` が無いときは、本番に落ちるのではなく **DB
+無しで動く**。落としたら、プレビュー全部が本番に書くことになる。
 
 `TURSO_AUTH_TOKEN` は同じグループならグループトークン一つで両方に通る。
 
