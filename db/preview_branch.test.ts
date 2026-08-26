@@ -26,7 +26,7 @@ const configured = {
   TURSO_PLATFORM_TOKEN: "platform-token",
   TURSO_ORG: "kuboon",
   TURSO_SOURCE_DATABASE: "game-center",
-  TURSO_DATABASE_URL: PREVIEW_URL,
+  PREVIEW_DATABASE_URL: PREVIEW_URL,
 };
 
 Deno.test("reads the preview database's name out of its own URL", () => {
