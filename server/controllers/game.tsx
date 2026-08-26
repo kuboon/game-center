@@ -83,6 +83,17 @@ export const gamePageAction = {
 
         <div class="space-y-2">
           <PlayButton gameId={game.id} gameUrl={game.url} />
+          <p class="text-sm opacity-70">
+            <a
+              class="link"
+              href={routes.play.href({ handle, slug })}
+              rmx-target="content"
+            >
+              ハブの中で遊ぶ
+            </a>{" "}
+            —
+            埋め込みを許可しているゲームなら、ページを離れずに実績が記録されます。
+          </p>
         </div>
 
         <div class="card card-border bg-base-100">

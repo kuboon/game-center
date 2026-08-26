@@ -6,7 +6,8 @@
     "./tests",
     "./packages/session_storage_kv",
     "./packages/dpop_session_middleware",
-    "./packages/protocol"
+    "./packages/protocol",
+    "./packages/sdk"
   ],
   "tasks": {
     "dev": "deno task --cwd server dev",
@@ -26,7 +27,8 @@
   },
   "fmt": {
     "exclude": [
-      "docs/"
+      "docs/",
+      "skills/"
     ]
   },
   "nodeModulesDir": "auto",
@@ -48,5 +50,9 @@
     "tailwindcss": "npm:tailwindcss@^4.1.18",
     "@kuboon/remix-data-table-sqlite-turso": "jsr:@kuboon/remix-data-table-sqlite-turso@^0.3.0",
     "@std/assert": "jsr:@std/assert@^1.0.19"
+  },
+  "deploy": {
+    "org": "kbn",
+    "app": "game-center"
   }
 }

@@ -25,6 +25,9 @@ Deno workspace。
 - `bundler/` — `Deno.bundle` による JS ビルドと Tailwind CSS ビルド。出力は
   `bundled/`(git 管理外)
 - `assets/style.css` — Tailwind v4 + daisyUI の入力 CSS
+- `packages/sdk` — ゲームに同梱する SDK。単一ファイル、依存ゼロ
+- `action/` — ゲーム登録用の composite action。secret を取らない
+- `skills/game-center/SKILL.md` — ゲームを作る LLM 向けの skill
 - `tests/` — FFI 権限が要るテスト(ローカル SQLite
   に対するマイグレーション検証)。詳細は [tests/README.md](tests/README.md)
 
@@ -58,16 +61,19 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   テーブルは作り直せないので、主キーを振り直す変更は子ごと消すことになる
 - マイグレーションはデプロイ手順の一段として `deno task migrate`
   で適用する。起動時には適用しない(Deno Deploy では isolate ごとに競合するため)
-- **pre-deploy はプレビューでも走る**。コンテキストごとに `TURSO_DATABASE_URL`
-  を分け、Build と Development はプレビュー DB を指す
+- **pre-deploy はプレビューでも走るが、読めるのは Build コンテキストだけ**。
+  コンテキストは名前ごとに値を一つしか持てないので、向き先は `DENO_TIMELINE`
+  で決める。本番なら `TURSO_DATABASE_URL`、それ以外なら `PREVIEW_DATABASE_URL`。
+  破壊経路は後者しか読まないので、本番の URL を書き間違えても届かない
 - **プレビューでは migrate の前に本番から branch
   し直す**(`db/preview_branch.ts`)。
   マイグレーションが本番の実データに耐えるかを試している場所が他に無いため。 CI
   も `reset` も空のテーブルにしか当てない。未マージのマイグレーションを
   直したときの drift も、DB が毎回新しいので起きなくなる
-- 破壊的な経路は `DENO_TIMELINE != production` かつ `PREVIEW_DATABASE=1`
-  の両方が揃ったときだけ動く。プレビュー DB の名前は URL から導出し、
-  複製元と一致したら設定ミスとして止まる
+- 破壊的な経路は `DENO_TIMELINE != production` かつ `PREVIEW_DATABASE_URL`
+  が設定されているときだけ動き、**`TURSO_DATABASE_URL` を一度も読まない**。
+  プレビュー DB の名前は `PREVIEW_DATABASE_URL` から導出し、二つの URL
+  が一致するか複製元と一致したら設定ミスとして止まる
 - CLI のバージョンは `deno.json` の `imports` で一度だけ固定する。
   `tests/support/db.ts` は `deno task db` を起動するので、そこには書かない
 
@@ -154,6 +160,23 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 `/me` の「ゲームを作る AI に渡す」は、作者 ID を埋め込んだ手順一式を
 クリップボードに入れる。識別子を手で写させないため
 
+## SDK
+
+`packages/sdk`
+は依存ゼロの単一ファイル。**コピペできる大きさに保つこと自体が仕様** (Artifacts
+は外部スクリプトを読めない)。
+
+- `unlock()` は postMessage → REST → claim URL の順に落ちる。**例外を投げず、
+  勝手に遷移しない**。`recorded` が false なら `claimUrl` を返すので、
+  呼び出し側が `claimLink()` でリンクを出す
+- 起動トークンはフラグメントから読んで localStorage に入れ、アドレスバーから
+  消す。401 が返ったら捨てる(以後成功しえないリクエストを待たないため)
+- `lib` はブラウザのものだけ。ゲームに同梱されるファイルに Deno の API が
+  紛れないようにする。`deno.ns` を参照するのはテストだけ
+- `/play/@{author}/{slug}` が postMessage の親。**`event.origin` が登録済み
+  ゲームの origin と一致することを確かめてから他の何もしない**。その origin は
+  メッセージではなく SSR された登録内容から来る
+
 ## 実績解除
 
 解除は3モードあるが、サーバ側の入口は2つ。ゲームからの REST
@@ -174,6 +197,20 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - `/api/game/v1/*` だけ CORS を全開放する(`server/middleware/game_cors.ts`)。
   Cookie を使わずヘッダのトークンで認証するので開放してよい。エラー応答にも
   ヘッダを付ける。付けないとゲームが 401 を読めず claim URL に落ちられない
+
+## LLM 向け提供物
+
+ゲームを作るのはたいてい LLM
+なので、**一度読めば正しく組み込める**ことを成果物の 条件にする。
+
+- `docs/protocol.md` が正本。`/llms.txt` は `bundler/llms.ts` がそこと
+  `packages/sdk/mod.ts` から**生成**する。仕様を書き写したファイルは、いずれ
+  仕様と食い違う
+- `/llms.txt` は仕様・SDK 全文・最小の実例を一つに収める。四つのページを取りに
+  行かせると、どれかを読み落とす
+- `skills/game-center/SKILL.md` は「まず作者 ID をユーザに聞く」から始まる。
+  不透明な識別子なので推測させない
+- `skills/` は `docs/` と同じく `deno fmt` の対象外(一文一行を保つため)
 
 ## 規約
 

@@ -26,7 +26,7 @@ import {
   withDb,
 } from "./support/db.ts";
 
-const LATEST_MIGRATION = "20260823000000";
+const LATEST_MIGRATION = "20260824000000";
 
 Deno.test("migrate creates every table the design declares", async () => {
   await migratedDb(async (client) => {
@@ -43,7 +43,7 @@ Deno.test("migrate creates every table the design declares", async () => {
     ) {
       assert(tables.includes(table), `missing table: ${table}`);
     }
-    // Sessions moved into the generic kv store.
+    // Sessions live in the generic kv store, not a table of their own.
     assertEquals(tables.includes("dpop_sessions"), false);
     // The registry authenticates nobody, so there is nothing to store.
     assertEquals(tables.includes("api_tokens"), false);
@@ -88,65 +88,28 @@ Deno.test("migrate is a no-op once applied", async () => {
   });
 });
 
-Deno.test("rollback reverts one migration at a time", async () => {
+Deno.test("rollback takes the schema back to nothing, and forward again", async () => {
   await withDb(async (url, client) => {
     assertOk(await runDb(url, "migrate"), "migrate");
+    assert((await tableNames(client)).includes("games"));
 
-    // Undo the IdP-derived handles: nobody has one again.
-    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback handles");
-
-    // Undo author-scoped ids: the slug column goes.
-    assertOk(
-      await runDb(url, "rollback", "--step", "1"),
-      "rollback scoped ids",
-    );
-    const gameColumns = await client.execute("pragma table_info(games)");
-    assertEquals(
-      gameColumns.rows.some((row) => String(row.name) === "slug"),
-      false,
-      "games.slug survived rollback",
-    );
-
-    // Undo authors: the approval queue and handles go.
-    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback authors");
-    assertEquals(
-      (await tableNames(client)).includes("game_registrations"),
-      false,
-    );
-    const columns = await client.execute("pragma table_info(users)");
-    assertEquals(
-      columns.rows.some((row) => String(row.name) === "handle"),
-      false,
-      "users.handle survived rollback",
-    );
-
-    // Undo URL ownership: games belong to accounts again, and tokens return.
-    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback ownership");
-    assert((await tableNames(client)).includes("api_tokens"));
-
-    // Undo the retired column: the table is rebuilt without it.
-    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback retired");
-    const achievementColumns = await client.execute(
-      "pragma table_info(achievements)",
-    );
-    assertEquals(
-      achievementColumns.rows.some((row) => String(row.name) === "retired"),
-      false,
-      "achievements.retired survived rollback",
-    );
-
-    // Undo the kv migration: sessions go back to their own table.
-    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback kv");
-    let tables = await tableNames(client);
-    assert(tables.includes("dpop_sessions"), "dpop_sessions was not restored");
-    assertEquals(tables.includes("kv"), false);
-
-    // Undo the initial migration: nothing of ours is left.
-    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback initial");
-    tables = await tableNames(client);
-    for (const table of ["users", "games", "achievements", "dpop_sessions"]) {
-      assertEquals(tables.includes(table), false, `${table} survived rollback`);
+    assertOk(await runDb(url, "rollback", "--step", "1"), "rollback");
+    const bare = await tableNames(client);
+    for (
+      const table of [
+        "users",
+        "games",
+        "achievements",
+        "user_achievements",
+        "game_registrations",
+        "kv",
+      ]
+    ) {
+      assertEquals(bare.includes(table), false, `${table} survived rollback`);
     }
+
+    assertOk(await runDb(url, "migrate"), "migrate again");
+    assert((await tableNames(client)).includes("games"));
   });
 });
 
