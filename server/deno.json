@@ -35,6 +35,8 @@
         "RP_ORIGIN",
         "RP_SIGNING_KEY_JWK",
         "TURSO_DATABASE_URL",
+        "PREVIEW_DATABASE_URL",
+        "DENO_TIMELINE",
         "TURSO_AUTH_TOKEN"
       ],
       "net": true,

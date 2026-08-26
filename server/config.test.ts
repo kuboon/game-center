@@ -42,3 +42,39 @@ Deno.test("lets the environment point at a local IdP", () => {
   assertEquals(config.idpOrigin, "http://localhost:8001");
   assertEquals(config.rpOrigin, "http://localhost:8000");
 });
+
+Deno.test("takes production's database only on production's timeline", () => {
+  const urls = {
+    TURSO_DATABASE_URL: "libsql://production",
+    PREVIEW_DATABASE_URL: "libsql://preview",
+  };
+
+  // A laptop has no timeline, and is production as far as this is concerned:
+  // there is one database and it is the one that was configured.
+  assertEquals(readConfig(urls).tursoDatabaseUrl, "libsql://production");
+  assertEquals(
+    readConfig({ ...urls, DENO_TIMELINE: "production" }).tursoDatabaseUrl,
+    "libsql://production",
+  );
+
+  for (const timeline of ["preview/abc123", "git-branch/some-feature"]) {
+    assertEquals(
+      readConfig({ ...urls, DENO_TIMELINE: timeline }).tursoDatabaseUrl,
+      "libsql://preview",
+      timeline,
+    );
+  }
+});
+
+Deno.test("gives a preview no database rather than production's", () => {
+  // Deno Deploy holds one value per variable name, so production's URL is
+  // visible to a preview too. Falling back to it would have every preview
+  // writing to production.
+  assertEquals(
+    readConfig({
+      TURSO_DATABASE_URL: "libsql://production",
+      DENO_TIMELINE: "preview/abc123",
+    }).tursoDatabaseUrl,
+    "",
+  );
+});
