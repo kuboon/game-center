@@ -175,6 +175,78 @@ export async function listUnlocksForGame(
   return result.rows.map(toUnlock);
 }
 
+/**
+ * One player's unlock of one achievement, as it appears next to somebody
+ * else's.
+ */
+export interface PeerUnlock {
+  readonly key: string;
+  readonly title: string;
+  readonly hidden: boolean;
+  readonly handle: string;
+  readonly displayName: string;
+  readonly score: number | null;
+  readonly unlockedAt: string;
+  /** True for the viewer's own row, so it can be marked as theirs. */
+  readonly self: boolean;
+}
+
+/**
+ * What the viewer and the people they follow have unlocked in one game.
+ *
+ * The viewer is included on purpose: the point of the list is comparison, and
+ * a comparison you are not in is just a list of other people.
+ *
+ * Confined to people the viewer chose. There is no game-wide leaderboard here
+ * and there will not be one — an unlock is a claim, not a fact, and a ranking
+ * is the place where making a false one starts to pay. See
+ * docs/grand_design.md, "偽装は防がない、代わりに誰を見るかを選ばせる".
+ *
+ * Ordered by the manifest's own achievement order, then by score with the
+ * highest first, then by who got there earliest. Unscored unlocks sort after
+ * scored ones rather than in front of them.
+ *
+ * @param client Database to read from
+ * @param viewerId The player looking, whose follows decide who else appears
+ * @param gameId The game being looked at
+ */
+export async function listUnlocksAmongFollowed(
+  client: Client,
+  viewerId: number,
+  gameId: string,
+): Promise<PeerUnlock[]> {
+  const result = await client.execute({
+    sql: `select achievements.key, achievements.title, achievements.hidden,
+                 users.handle, users.display_name,
+                 user_achievements.score, user_achievements.unlocked_at,
+                 user_achievements.user_id = ? as self
+            from user_achievements
+            join achievements
+              on achievements.id = user_achievements.achievement_id
+            join users on users.id = user_achievements.user_id
+           where achievements.game_id = ?
+             and users.handle is not null
+             and (user_achievements.user_id = ?
+                  or user_achievements.user_id in
+                     (select followee_id from follows where follower_id = ?))
+           order by achievements.sort_order, achievements.id,
+                    user_achievements.score is null,
+                    user_achievements.score desc,
+                    user_achievements.unlocked_at asc`,
+    args: [viewerId, gameId, viewerId, viewerId],
+  });
+  return result.rows.map((row) => ({
+    key: String(row.key),
+    title: String(row.title),
+    hidden: Number(row.hidden) === 1,
+    handle: String(row.handle),
+    displayName: String(row.display_name),
+    score: row.score === null ? null : Number(row.score),
+    unlockedAt: String(row.unlocked_at),
+    self: Number(row.self) === 1,
+  }));
+}
+
 /** Total points a player has earned, across every game. */
 export async function totalPoints(
   client: Client,

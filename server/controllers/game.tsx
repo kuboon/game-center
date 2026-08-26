@@ -9,6 +9,7 @@
 
 import type { Action } from "@remix-run/fetch-router";
 
+import { PeerScores } from "../../client/peer_scores.tsx";
 import { PlayButton } from "../../client/play_button.tsx";
 import { getDb } from "../db/client.ts";
 import { gameRef } from "@game-center/protocol";
@@ -110,6 +111,8 @@ export const gamePageAction = {
               )}
           </div>
         </div>
+
+        <PeerScores handle={handle} slug={slug} />
       </main>,
     );
   },

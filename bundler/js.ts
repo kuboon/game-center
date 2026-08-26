@@ -16,6 +16,7 @@ const CLIENT_ENTRIES = [
   "prompt_card.tsx",
   "play_frame.tsx",
   "follow_button.tsx",
+  "peer_scores.tsx",
 ] as const;
 
 export async function buildJs(

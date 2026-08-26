@@ -282,3 +282,11 @@ Deno.test("the follow API stays same-origin, like the rest of /api/internal", as
   );
   assertEquals(response.headers.get("access-control-allow-origin"), null);
 });
+
+Deno.test("comparing records with the people you follow needs a session", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/api/internal/games/@kuboon/puzzle/peers"),
+  );
+  assertEquals(response.status, 401);
+  assertEquals(response.headers.get("cache-control"), "no-store");
+});
