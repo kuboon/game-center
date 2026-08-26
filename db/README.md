@@ -72,15 +72,31 @@ libSQL は素の SQLite と違って外部キーを既定で有効にする。
 ## デプロイと環境
 
 Deno Deploy の pre-deploy が `deno task migrate` を走らせる。
-これは**プレビューを含む全デプロイで走る**ので、そのコンテキストの
-`TURSO_DATABASE_URL` が指す DB に適用される。
-環境変数はコンテキストごとに分かれ、ビルド用はランタイムとも別に持てる。
+これは**プレビューを含む全デプロイで走る**。 コンテキストは Production / Preview
+/ Build の三つで、`deno deploy env update-contexts` が受け付ける名前も
+この綴りである。
 
-| コンテキスト | `TURSO_DATABASE_URL` | `PREVIEW_DATABASE` |
-| ------------ | -------------------- | ------------------ |
-| Build        | プレビュー DB        | `1`                |
-| Development  | プレビュー DB        | `1`                |
-| Production   | 本番                 | 設定しない         |
+**pre-deploy が読めるのは Build コンテキストだけ**。
+公式ドキュメントの言い方では 「Environment variables configured for the "Build"
+context are available during builds, but variables from "Production" or
+"Development" contexts are not」。
+一方でコンテキストは名前ごとに値を一つしか持てないので、Build に置いた
+`TURSO_DATABASE_URL` は本番のビルドとプレビューのビルドの両方に同じ値を渡す。
+コンテキストで向き先を分けることは、pre-deploy に関しては**できない**。
+
+そこで向き先は `DENO_TIMELINE` で決める。 ドキュメントもそのために渡していると
+書いている(「so migrations can target the correct environment」)。
+本番のタイムラインなら `TURSO_DATABASE_URL`、それ以外なら
+`PREVIEW_DATABASE_URL`。 二つは Build コンテキストに並べて置く。
+
+| コンテキスト | `TURSO_DATABASE_URL` | `PREVIEW_DATABASE_URL` |
+| ------------ | -------------------- | ---------------------- |
+| Build        | 本番                 | プレビュー DB          |
+| Production   | 本番                 | 設定しない             |
+| Preview      | プレビュー DB        | 設定しない             |
+
+Build の二行だけが pre-deploy 用で、残りはサーバが実行時に読むものである。
+サーバは自分のコンテキストを読むので、そちらは素直に分ければよい。
 
 `TURSO_AUTH_TOKEN` は同じグループならグループトークン一つで両方に通る。
 
@@ -120,22 +136,23 @@ create  https://api.turso.tech/v1/organizations/{org}/databases
 | `TURSO_SOURCE_DATABASE` | 複製元、つまり本番の DB 名                                     |
 | `TURSO_GROUP`           | 省略時 `default`                                               |
 
-プレビュー DB の**名前は指定しない**。`TURSO_DATABASE_URL` から導出する。 一つの
-DB に二つの名前を持たせることが、間違ったほうを消す原因になる。
+プレビュー DB の**名前は指定しない**。`PREVIEW_DATABASE_URL` から導出する。
+一つの DB に二つの名前を持たせることが、間違ったほうを消す原因になる。
 
 ### 壊してよい条件
 
-破壊的な経路(切り直しと
-`reset --force`)は、独立した二つの条件が揃ったときだけ動く。
+破壊的な経路(切り直しと `reset --force`)は、二つが揃ったときだけ動く。
 
 - `DENO_TIMELINE` が `production` でない
-- `PREVIEW_DATABASE=1` が設定されている
+- `PREVIEW_DATABASE_URL` が設定されている
 
-後者を URL と同じコンテキストに置くのは、**URL
-の配線ミスだけがこれらを致命的にする**からである。 加えて、導出したプレビュー DB
-名が `TURSO_SOURCE_DATABASE` と一致したら設定ミスとして停止する。
+肝心なのは、**これらが `TURSO_DATABASE_URL` を一度も読まない**ことである。
+壊せる DB を名指しする変数と、壊してはいけない DB を名指しする変数が別なので、
+本番の URL を書き間違えても破壊経路には届かない。 加えて二つの URL
+が一致したら停止し、導出したプレビュー DB 名が `TURSO_SOURCE_DATABASE`
+と一致しても停止する。
 
-`PREVIEW_DATABASE` が無ければ `deno task migrate` は `db migrate`
+`PREVIEW_DATABASE_URL` が無ければ `deno task migrate` は `db migrate`
 そのもので、何も壊さない。 切り直しの設定が無いプレビューでは、migrate
 に失敗したときだけ `reset --force` で建て直す。
 

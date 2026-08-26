@@ -61,16 +61,19 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   テーブルは作り直せないので、主キーを振り直す変更は子ごと消すことになる
 - マイグレーションはデプロイ手順の一段として `deno task migrate`
   で適用する。起動時には適用しない(Deno Deploy では isolate ごとに競合するため)
-- **pre-deploy はプレビューでも走る**。コンテキストごとに `TURSO_DATABASE_URL`
-  を分け、Build と Development はプレビュー DB を指す
+- **pre-deploy はプレビューでも走るが、読めるのは Build コンテキストだけ**。
+  コンテキストは名前ごとに値を一つしか持てないので、向き先は `DENO_TIMELINE`
+  で決める。本番なら `TURSO_DATABASE_URL`、それ以外なら `PREVIEW_DATABASE_URL`。
+  破壊経路は後者しか読まないので、本番の URL を書き間違えても届かない
 - **プレビューでは migrate の前に本番から branch
   し直す**(`db/preview_branch.ts`)。
   マイグレーションが本番の実データに耐えるかを試している場所が他に無いため。 CI
   も `reset` も空のテーブルにしか当てない。未マージのマイグレーションを
   直したときの drift も、DB が毎回新しいので起きなくなる
-- 破壊的な経路は `DENO_TIMELINE != production` かつ `PREVIEW_DATABASE=1`
-  の両方が揃ったときだけ動く。プレビュー DB の名前は URL から導出し、
-  複製元と一致したら設定ミスとして止まる
+- 破壊的な経路は `DENO_TIMELINE != production` かつ `PREVIEW_DATABASE_URL`
+  が設定されているときだけ動き、**`TURSO_DATABASE_URL` を一度も読まない**。
+  プレビュー DB の名前は `PREVIEW_DATABASE_URL` から導出し、二つの URL
+  が一致するか複製元と一致したら設定ミスとして止まる
 - CLI のバージョンは `deno.json` の `imports` で一度だけ固定する。
   `tests/support/db.ts` は `deno task db` を起動するので、そこには書かない
 

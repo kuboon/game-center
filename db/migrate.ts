@@ -1,9 +1,21 @@
 /**
  * `deno task migrate` — what the deployment's pre-deploy step runs.
  *
- * It runs for every deployment, previews included, against whatever database
- * that context is wired to. So it does three different things depending on
- * which database that is.
+ * It runs once per timeline, production and previews alike, and each one has to
+ * reach a different database. It cannot learn which from the environment the
+ * way the server does: Deno Deploy gives the pre-deploy step the Build context
+ * only, and a context holds one value per name. Whichever database the Build
+ * context named, one of the two timelines would be migrating the wrong one.
+ *
+ * So the timeline chooses, not the wiring. `DENO_TIMELINE` says which
+ * deployment is being prepared — production takes `TURSO_DATABASE_URL`,
+ * anything else takes `PREVIEW_DATABASE_URL`. Both sit in the Build context
+ * together, and neither can stand in for the other.
+ *
+ * That also settles what may be destroyed. The destructive paths below address
+ * only the database named by `PREVIEW_DATABASE_URL`, and only off the
+ * production timeline. A mistake in `TURSO_DATABASE_URL` cannot reach them,
+ * because they never read it.
  *
  * Production: apply pending migrations. Nothing else, ever.
  *
@@ -24,19 +36,35 @@ import { runTursoDbCli } from "@kuboon/remix-data-table-sqlite-turso";
 /** `production`, `git-branch/<name>`, `preview/<id>`, or absent off-platform. */
 const timeline = Deno.env.get("DENO_TIMELINE") ?? "local";
 
+const productionUrl = Deno.env.get("TURSO_DATABASE_URL");
+const previewUrl = Deno.env.get("PREVIEW_DATABASE_URL");
+
 /**
- * Set on the contexts pointed at a throwaway database, next to the URL it
- * describes. Every destructive path below is behind it, because a misconfigured
- * URL is the only thing that would make them catastrophic — so the permission
- * to destroy lives beside the URL rather than being inferred from it.
+ * A database nobody needs to keep: the preview one, on a preview's timeline.
+ *
+ * Both halves are required. On a laptop there is no timeline and no preview
+ * URL, so nothing is disposable and this behaves like plain `db migrate`.
  */
-const disposable = Deno.env.get("PREVIEW_DATABASE") === "1" &&
-  timeline !== "production";
+const disposable = timeline !== "production" && !!previewUrl;
+
+// Two names for one database is how the wrong one gets destroyed. Converged,
+// they are wrong in the single way that would be unrecoverable.
+if (disposable && previewUrl === productionUrl) {
+  console.error(
+    "[db] PREVIEW_DATABASE_URL and TURSO_DATABASE_URL name one database",
+  );
+  Deno.exit(1);
+}
+
+const url = disposable ? previewUrl : productionUrl;
 
 async function run(...args: string[]): Promise<number> {
   console.log(`[db] ${args.join(" ")} (${timeline})`);
+  // Passed rather than left to the environment: the runner would read
+  // TURSO_DATABASE_URL, which is the one database a preview must not touch.
+  const target = url ? ["--url", url] : [];
   try {
-    return await runTursoDbCli([...args, ...Deno.args]);
+    return await runTursoDbCli([...args, ...target, ...Deno.args]);
   } catch (error) {
     console.error(`[db] ${(error as Error).message}`);
     return 1;
