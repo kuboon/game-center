@@ -283,6 +283,15 @@ Deno.test("the follow API stays same-origin, like the rest of /api/internal", as
   assertEquals(response.headers.get("access-control-allow-origin"), null);
 });
 
+Deno.test("the personal part of the catalog needs a session", async () => {
+  // The catalog itself is public and server-rendered; this is the half built
+  // from who you follow, so there is nobody to answer for without a proof.
+  const response = await router.fetch(
+    new Request("http://localhost/api/internal/catalog"),
+  );
+  assertEquals(response.status, 401);
+});
+
 Deno.test("comparing records with the people you follow needs a session", async () => {
   const response = await router.fetch(
     new Request("http://localhost/api/internal/games/@kuboon/puzzle/peers"),

@@ -32,6 +32,7 @@ export const routes = route({
   internalFollow: post("/api/internal/follows"),
   internalUnfollow: del("/api/internal/follows/@:handle"),
   internalFollowState: get("/api/internal/follows/@:handle"),
+  internalCatalog: get("/api/internal/catalog"),
   internalGamePeers: get("/api/internal/games/@:handle/:slug/peers"),
 
   gameUnlock: post("/api/game/v1/unlock"),

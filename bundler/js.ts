@@ -16,6 +16,7 @@ const CLIENT_ENTRIES = [
   "prompt_card.tsx",
   "play_frame.tsx",
   "follow_button.tsx",
+  "catalog_sections.tsx",
   "peer_scores.tsx",
 ] as const;
 

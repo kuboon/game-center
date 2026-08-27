@@ -151,6 +151,11 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - ただし `hidden` の実績は他人に題名を見せない(`server/lib/spoilers.ts`)。
   プロフィールは公開ページなので、ここが漏れると全ゲームの秘密が漏れる
 - フォローボタンだけ clientEntry。誰がフォローしているかは SSR では分からない
+- **`/@{handle}` に来るサインアウトの訪問者が本命**。作者が SNS に貼った URL を
+  踏んだ人であり、ここでサインアップしてもらう。「サインインしてフォロー」を出し、
+  戻ってきたら自動でフォローする
+- 意図は `sessionStorage`(`client/follow_intent.ts`)。**戻り先 URL に載せない**
+  — 開いた人が黙って誰かをフォローするリンクを配れてしまう。読み出しは一度きり
 
 ## ハンドル
 

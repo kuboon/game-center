@@ -72,6 +72,7 @@ export const authorPageAction = {
           </div>
           <FollowButton
             handle={author.handle}
+            displayName={author.displayName}
             followers={follows.followers}
             followees={follows.followees}
           />
