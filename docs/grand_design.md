@@ -622,6 +622,26 @@ create index follows_followee on follows (followee_id);
 
 SSR に DPoP 証明を付けられないため、フォローボタンは clientEntry である(`NavAuth` と同じ)。
 
+### 共有されたときの見え方
+
+このページは SNS に貼られる前提なので、貼った先で何と表示されるかが最初の接点になる。
+`og:title` / `og:description` / `og:url` と `rel=canonical` を出す。
+
+**画像は生成しない。**
+プロフィールは IdP のアバター、ゲームはマニフェストの `icon_url` を使い、
+どちらも無ければ画像なしのカードを出す。
+中身のないプレースホルダを置いたカードより、小さくても収まっているカードのほうが良い。
+`twitter:card` も、画像があるときだけ `summary_large_image` にする。
+
+`og:url` はハブ自身の origin から組み立てる。
+プロキシの内側ではリクエストのホストが内部名になりうるので、
+それを指す canonical は無いよりも悪い。
+
+カードの中身を作るのは `server/ui/share_cards.ts` の純関数である。
+サーバは fetch ベースの libSQL を使っていて `file:` を開けないため、
+データの入ったページを描画するテストが書けない。
+そこで内容だけを切り出して直接試している。
+
 ### サインアウトの訪問者が主役である
 
 **人が game-center に来る一番多い経路は、作者がこの URL を SNS に貼り、それを見た人がリンクを踏むことである。**

@@ -27,6 +27,7 @@ import { listUnlocks, type Unlock } from "../db/unlocks.ts";
 import { findUserByHandle } from "../db/users.ts";
 import { publicTitle } from "../lib/spoilers.ts";
 import { routes } from "../routes.ts";
+import { profileMeta } from "../ui/share_cards.ts";
 import { renderPage } from "../utils/render.tsx";
 
 /** How much of a record to show before it stops being a summary. */
@@ -51,6 +52,7 @@ export const authorPageAction = {
             。
           </p>
         </main>,
+        { title: `@${handle} は見つかりません` },
       );
     }
 
@@ -105,6 +107,11 @@ export const authorPageAction = {
             : null}
         </section>
       </main>,
+      profileMeta(author, {
+        games: active.length,
+        unlocks: unlocks.length,
+        followers: follows.followers,
+      }),
     );
   },
 } satisfies Action<typeof routes.author>;
