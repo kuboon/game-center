@@ -274,20 +274,91 @@ export async function listGamesWithAuthors(
   client: Client,
 ): Promise<GameWithAuthor[]> {
   const result = await client.execute(
-    `select games.id, games.owner_id, games.slug, games.manifest_url,
-            games.title, games.description, games.url, games.icon_url,
-            games.status,
-            users.handle as author_handle, users.display_name as author_name
-       from games
-       join users on users.id = games.owner_id
+    `${CATALOG_COLUMNS}
       where games.status = 'active'
       order by games.created_at desc`,
   );
-  return result.rows.map((row) => ({
+  return result.rows.map(toGameWithAuthor);
+}
+
+/**
+ * Active games made by the people this player follows, newest first.
+ *
+ * The follow set is a subquery rather than a list of ids passed in: it keeps
+ * the whole thing one round trip, and there is no id list to build wrongly.
+ *
+ * @param client Database to read from
+ * @param viewerId The player whose follows decide what is listed
+ */
+export async function listGamesByFollowedAuthors(
+  client: Client,
+  viewerId: number,
+): Promise<GameWithAuthor[]> {
+  const result = await client.execute({
+    sql: `${CATALOG_COLUMNS}
+           where games.status = 'active'
+             and games.owner_id in (${FOLLOWEES})
+           order by games.created_at desc`,
+    args: [viewerId],
+  });
+  return result.rows.map(toGameWithAuthor);
+}
+
+/**
+ * Active games the people this player follows have actually played, most
+ * recently played first.
+ *
+ * Games by a followed author are left out, because they already have a section
+ * of their own and a catalog that says the same thing twice is a worse catalog.
+ *
+ * This is the whole of what the hub will ever call a recommendation. There is
+ * no global popularity here and no ranking, on purpose: see docs/grand_design.md,
+ * "偽装は防がない、代わりに誰を見るかを選ばせる".
+ *
+ * @param client Database to read from
+ * @param viewerId The player whose follows decide what is listed
+ */
+export async function listGamesPlayedByFollowed(
+  client: Client,
+  viewerId: number,
+): Promise<GameWithAuthor[]> {
+  const result = await client.execute({
+    sql: `${CATALOG_SELECT}, max(user_achievements.unlocked_at) as last_played
+            from games
+            join users on users.id = games.owner_id
+            join achievements on achievements.game_id = games.id
+            join user_achievements
+              on user_achievements.achievement_id = achievements.id
+           where games.status = 'active'
+             and user_achievements.user_id in (${FOLLOWEES})
+             and games.owner_id not in (${FOLLOWEES})
+           group by games.id
+           order by last_played desc`,
+    args: [viewerId, viewerId],
+  });
+  return result.rows.map(toGameWithAuthor);
+}
+
+/** The columns every catalog listing selects, and the join that names authors. */
+const CATALOG_SELECT =
+  `select games.id, games.owner_id, games.slug, games.manifest_url,
+          games.title, games.description, games.url, games.icon_url,
+          games.status,
+          users.handle as author_handle, users.display_name as author_name`;
+
+const CATALOG_COLUMNS = `${CATALOG_SELECT}
+     from games
+     join users on users.id = games.owner_id`;
+
+/** Who the viewer follows, as a subquery. */
+const FOLLOWEES = `select followee_id from follows where follower_id = ?`;
+
+function toGameWithAuthor(row: Record<string, unknown>): GameWithAuthor {
+  return {
     ...toGame(row),
     authorHandle: row.author_handle === null ? null : String(row.author_handle),
     authorName: String(row.author_name),
-  }));
+  };
 }
 
 /** Games a player wrote, whatever their status. */
