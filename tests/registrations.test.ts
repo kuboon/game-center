@@ -13,8 +13,10 @@ import type { GameManifest } from "@game-center/protocol";
 import { findGame, listGames, registerGame } from "../server/db/games.ts";
 import {
   findPending,
+  hasRefused,
   listPending,
   MAX_PENDING_PER_AUTHOR,
+  refusePending,
   removePending,
   submitRegistration,
   TooManyPendingError,
@@ -230,5 +232,66 @@ Deno.test("an approved URL keeps writing without asking again", async () => {
     );
     assertEquals(updated.created, false);
     assertEquals(updated.game.title, "My Puzzle 2");
+  });
+});
+
+Deno.test("refusing a URL outlives the submission it removes", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    const pending = await submit(client, kuboon.id);
+
+    assertEquals(await hasRefused(client, kuboon.id, MANIFEST_URL), false);
+    assertEquals(await refusePending(client, kuboon.id, pending.id), true);
+
+    // The row is gone and the refusal is not. The endpoint that queued it
+    // takes no credential, so forgetting would let the same URL come straight
+    // back, and the queue would become a way to keep tapping someone on the
+    // shoulder.
+    assertEquals(await findPending(client, kuboon.id, pending.id), null);
+    assertEquals(await hasRefused(client, kuboon.id, MANIFEST_URL), true);
+  });
+});
+
+Deno.test("refusing the same URL a second time is not an error", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    await refusePending(
+      client,
+      kuboon.id,
+      (await submit(client, kuboon.id)).id,
+    );
+
+    const again = await submit(client, kuboon.id);
+    assertEquals(await refusePending(client, kuboon.id, again.id), true);
+    assertEquals(await hasRefused(client, kuboon.id, MANIFEST_URL), true);
+  });
+});
+
+Deno.test("one author's refusal says nothing about another's", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    const other = await author(client, "someone-else");
+    await refusePending(
+      client,
+      kuboon.id,
+      (await submit(client, kuboon.id)).id,
+    );
+
+    // Refusing means "my name does not belong on that document", which is not
+    // a claim about anybody else's name.
+    assertEquals(await hasRefused(client, other.id, MANIFEST_URL), false);
+  });
+});
+
+Deno.test("refusing a submission that is not yours does nothing", async () => {
+  await migratedDb(async (client) => {
+    const kuboon = await author(client);
+    const other = await author(client, "someone-else");
+    const pending = await submit(client, kuboon.id);
+
+    assertEquals(await refusePending(client, other.id, pending.id), false);
+    assertEquals(await hasRefused(client, other.id, MANIFEST_URL), false);
+    // And the real author's submission is still waiting for them.
+    assert(await findPending(client, kuboon.id, pending.id));
   });
 });

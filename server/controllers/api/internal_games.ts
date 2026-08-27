@@ -15,6 +15,7 @@ import { listAchievements, listGamesOwnedBy } from "../../db/games.ts";
 import {
   findPending,
   listPending,
+  refusePending,
   removePending,
 } from "../../db/registrations.ts";
 import { authenticateSession } from "../../lib/auth.ts";
@@ -126,7 +127,7 @@ export const internalDismissAction = {
     const id = Number(context.params.id);
     if (!Number.isInteger(id)) return apiError("Unknown registration", 404);
 
-    const dismissed = await removePending(requireDb(), auth.user.id, id);
+    const dismissed = await refusePending(requireDb(), auth.user.id, id);
     if (!dismissed) return apiError("Unknown registration", 404);
     return apiJson({ dismissed: true });
   },

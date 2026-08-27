@@ -25,11 +25,16 @@ const game: Game = {
 };
 
 Deno.test("a profile card names the person and what they have done", () => {
-  const meta = profileMeta(author, { games: 2, unlocks: 7, followers: 3 });
+  const meta = profileMeta(author, {
+    games: 2,
+    unlocks: 7,
+    points: 120,
+    followers: 3,
+  });
   assertEquals(meta.title, "Ohkubo KOHEI (@kuboon)");
   assertEquals(
     meta.description,
-    "ゲーム 2 本、解除した実績 7 件。フォロワー 3 人。",
+    "ゲーム 2 本、解除した実績 7 件 / 120 ポイント。フォロワー 3 人。",
   );
   assertEquals(meta.image, "https://avatars.example/48445");
   assertEquals(meta.type, "profile");
@@ -39,13 +44,14 @@ Deno.test("a profile card goes out without a picture rather than a placeholder",
   const meta = profileMeta({ ...author, avatarUrl: null }, {
     games: 0,
     unlocks: 0,
+    points: 0,
     followers: 0,
   });
   assertEquals(meta.image, undefined);
   // Still says something true. A brand-new account is not a broken page.
   assertEquals(
     meta.description,
-    "ゲーム 0 本、解除した実績 0 件。フォロワー 0 人。",
+    "ゲーム 0 本、解除した実績 0 件 / 0 ポイント。フォロワー 0 人。",
   );
 });
 

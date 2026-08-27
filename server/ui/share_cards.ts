@@ -21,12 +21,18 @@ import { absoluteUrl, type PageMeta, summarize } from "./page_meta.ts";
  */
 export function profileMeta(
   author: NamedUser,
-  counts: { games: number; unlocks: number; followers: number },
+  counts: {
+    games: number;
+    unlocks: number;
+    points: number;
+    followers: number;
+  },
 ): PageMeta {
   return {
     title: `${author.displayName} (@${author.handle})`,
     description: summarize(
-      `ゲーム ${counts.games} 本、解除した実績 ${counts.unlocks} 件。` +
+      `ゲーム ${counts.games} 本、` +
+        `解除した実績 ${counts.unlocks} 件 / ${counts.points} ポイント。` +
         `フォロワー ${counts.followers} 人。`,
     ),
     // From the IdP, when there is one. Nothing is generated to stand in.

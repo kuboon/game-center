@@ -28,6 +28,7 @@ import {
   type Registrant,
 } from "../db/games.ts";
 import {
+  hasRefused,
   type PendingRegistration,
   submitRegistration,
   TooManyPendingError,
@@ -82,6 +83,18 @@ export async function registerFromUrl(
     gameRef(handle, fetched.manifest.id),
     fetched.manifestUrl,
   );
+
+  // A refusal only blocks the path that needs blocking. The author arriving
+  // here as the submitter is acting on their own URL, not being asked about
+  // somebody else's submission, so changing their mind stays possible.
+  if (!known && submitter?.id !== author.id) {
+    if (await hasRefused(client, author.id, fetched.manifestUrl)) {
+      return apiError(
+        `@${handle} has declined this URL`,
+        409,
+      );
+    }
+  }
 
   if (known || submitter?.id === author.id) {
     return await store(
