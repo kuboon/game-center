@@ -14,6 +14,11 @@ jobs:
       - run: deno task check
       - run: deno task bundle
       - run: deno task test
+      # The SDK is published to JSR, which enforces rules `deno check` does not
+      # — a missing return type in the public API stops a release. Catching it
+      # on the PR beats finding out at publish time.
+      - run: deno publish --dry-run
+        working-directory: packages/sdk
 
   # A migration that has been applied cannot be edited: the runner records a
   # checksum for each one and refuses to continue when the file changes
