@@ -336,3 +336,30 @@ Deno.test("the frame response carries no head to put metadata in", async () => {
   assertEquals(html.includes("og:title"), false);
   assertEquals(html.includes("<title>"), false);
 });
+
+Deno.test("the landing page reads with no JavaScript and no database", async () => {
+  const response = await router.fetch(new Request("http://localhost/"));
+  const html = await response.text();
+
+  // The cabinet is markup and CSS, so it is all here in the first response.
+  assertStringIncludes(html, "PRESS START");
+  assertStringIncludes(html, "SELECT GAME");
+  assertStringIncludes(html, "crt-lines");
+  // No games and no database is the first thing anyone deploying this sees.
+  assertStringIncludes(html, "INSERT FIRST GAME");
+  assertStringIncludes(html, "0 GAMES AVAILABLE");
+});
+
+Deno.test("the landing page ranks nobody", async () => {
+  // The slot an arcade would fill with a high-score table shows the visitor
+  // their own score instead. A table ranking every player is the one place
+  // where forging an unlock would start to pay, and the hub does not have one.
+  // See docs/grand_design.md, "偽装は防がない、代わりに誰を見るかを選ばせる".
+  const html = await (await router.fetch(new Request("http://localhost/")))
+    .text();
+
+  assertStringIncludes(html, "YOUR SCORE");
+  for (const ranking of ["HIGH SCORE", "1ST", "2ND", "ランキング"]) {
+    assertEquals(html.includes(ranking), false, ranking);
+  }
+});

@@ -6,12 +6,96 @@
     dark --prefersdark;
 }
 
+/*
+ * The arcade palette, for the landing page only.
+ *
+ * The catalog rows, a profile, the dashboard — those are tools, and they
+ * follow the visitor's light/dark preference through daisyUI. The landing page
+ * is a cabinet: it is dark in both themes, on purpose, because a cabinet is
+ * dark so that it can glow. Its colours are named here rather than taken from
+ * `--color-base-*` for exactly that reason.
+ */
+@theme {
+  --color-arcade-screen: #06081a;
+  --color-arcade-panel: #141834;
+  --color-arcade-shell: #161a35;
+  --color-arcade-edge: #2b3160;
+  --color-arcade-ink: #e8ecff;
+  --color-arcade-dim: #a7b0e0;
+  --color-arcade-cyan: #7ee7ff;
+  --color-arcade-amber: #ffd93d;
+  --color-arcade-pink: #ff5d8f;
+
+  /* Only for the cabinet's own lettering — never for Japanese body text. */
+  --font-dot: "DotGothic16", ui-monospace, monospace;
+
+  /* Marquee bulbs blink in hard steps; a fade would read as a glow. */
+  --animate-bulb: bulb 1.2s steps(1) infinite;
+  --animate-scan: scan 6s linear infinite;
+  --animate-attract: attract 2s ease-in-out infinite;
+}
+
+@keyframes bulb {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(600%);
+  }
+}
+
+@keyframes attract {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @layer base {
+  /* Nobody asked for a light show. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+
   code {
     font-family: ui-monospace, SFMono-Regular, "Fira Code", monospace;
     background-color: var(--color-base-200);
     padding: 0.1rem 0.35rem;
     border-radius: 0.25rem;
     font-size: 0.9em;
+  }
+}
+
+@layer components {
+  /* The CRT: scanlines over the screen, with a bright band sweeping down it. */
+  .crt-lines::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, var(--color-arcade-cyan) 5%, transparent) 0 2px,
+      transparent 2px 5px
+    );
   }
 }
