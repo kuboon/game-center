@@ -18,6 +18,7 @@ import { CatalogSections } from "../../client/catalog_sections.tsx";
 import { getDb } from "../db/client.ts";
 import { type GameWithAuthor, listGamesWithAuthors } from "../db/games.ts";
 import { routes } from "../routes.ts";
+import { SITE_NAME } from "../ui/page_meta.ts";
 import { renderPage } from "../utils/render.tsx";
 
 export const homeAction = {
@@ -61,6 +62,12 @@ export const homeAction = {
             </section>
           )}
       </main>,
+      {
+        title: SITE_NAME,
+        description:
+          "いろんなミニゲームの実績を集めて管理するハブです。ゲームは第三者が作り、" +
+          "GitHub Pages や Claude Artifacts など、サーバのない場所で動きます。",
+      },
     );
   },
 } satisfies Action<typeof routes.home>;

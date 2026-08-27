@@ -17,6 +17,7 @@ import { gameRef } from "@game-center/protocol";
 import { type Achievement, findGame, listAchievements } from "../db/games.ts";
 import { findUserByHandle } from "../db/users.ts";
 import { routes } from "../routes.ts";
+import { gameMeta } from "../ui/share_cards.ts";
 import { renderPage } from "../utils/render.tsx";
 
 export const gamePageAction = {
@@ -38,6 +39,7 @@ export const gamePageAction = {
             に戻る。
           </p>
         </main>,
+        { title: `@${ref} は見つかりません` },
       );
     }
 
@@ -114,6 +116,11 @@ export const gamePageAction = {
 
         <PeerScores handle={handle} slug={slug} />
       </main>,
+      gameMeta(
+        game,
+        { achievements: achievements.length, points },
+        author?.handle,
+      ),
     );
   },
 } satisfies Action<typeof routes.game>;

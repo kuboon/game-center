@@ -23,10 +23,11 @@ import { FollowButton } from "../../client/follow_button.tsx";
 import { getDb } from "../db/client.ts";
 import { countFollows } from "../db/follows.ts";
 import { listGamesOwnedBy } from "../db/games.ts";
-import { listUnlocks, type Unlock } from "../db/unlocks.ts";
+import { listUnlocks, totalPoints, type Unlock } from "../db/unlocks.ts";
 import { findUserByHandle } from "../db/users.ts";
 import { publicTitle } from "../lib/spoilers.ts";
 import { routes } from "../routes.ts";
+import { profileMeta } from "../ui/share_cards.ts";
 import { renderPage } from "../utils/render.tsx";
 
 /** How much of a record to show before it stops being a summary. */
@@ -51,13 +52,15 @@ export const authorPageAction = {
             。
           </p>
         </main>,
+        { title: `@${handle} は見つかりません` },
       );
     }
 
-    const [games, unlocks, follows] = await Promise.all([
+    const [games, unlocks, follows, points] = await Promise.all([
       listGamesOwnedBy(client, author.id),
       listUnlocks(client, author.id),
       countFollows(client, author.id),
+      totalPoints(client, author.id),
     ]);
     const active = games.filter((game) => game.status === "active");
     const recent = unlocks.slice(0, RECENT_UNLOCKS);
@@ -91,7 +94,10 @@ export const authorPageAction = {
 
         <section class="space-y-3">
           <h2 class="text-xl font-bold">
-            解除した実績 {unlocks.length > 0 ? `(${unlocks.length})` : ""}
+            解除した実績{" "}
+            {unlocks.length > 0
+              ? `(${unlocks.length} 件 / ${points} ポイント)`
+              : ""}
           </h2>
           {recent.length === 0
             ? <p class="opacity-70">解除した実績はまだありません。</p>
@@ -105,6 +111,12 @@ export const authorPageAction = {
             : null}
         </section>
       </main>,
+      profileMeta(author, {
+        games: active.length,
+        unlocks: unlocks.length,
+        points,
+        followers: follows.followers,
+      }),
     );
   },
 } satisfies Action<typeof routes.author>;

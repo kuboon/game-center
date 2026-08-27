@@ -125,6 +125,59 @@ export async function findPending(
   return row ? toPending(row) : null;
 }
 
+/**
+ * Record that an author refused a URL, and take the submission off the queue.
+ *
+ * Refusing has to outlive the row it removes. The endpoint that queued it
+ * takes no credential, so without a memory the same stranger can post the same
+ * URL again immediately — and the queue becomes a way to keep tapping somebody
+ * on the shoulder.
+ *
+ * Scoped to the pair: refusing says "my name does not belong on that document"
+ * and says nothing about anybody else's.
+ *
+ * @param client Database to write to
+ * @param authorId The author doing the refusing
+ * @param id Their pending submission
+ * @returns True when a submission was refused
+ */
+export async function refusePending(
+  client: Client,
+  authorId: number,
+  id: number,
+): Promise<boolean> {
+  const pending = await findPending(client, authorId, id);
+  if (!pending) return false;
+
+  await client.execute({
+    sql: `insert into registration_refusals (manifest_url, author_id)
+          values (?, ?)
+          on conflict (manifest_url, author_id) do nothing`,
+    args: [pending.manifestUrl, authorId],
+  });
+  return await removePending(client, authorId, id);
+}
+
+/**
+ * Whether this author has already refused this URL.
+ *
+ * Consulted only on the unauthenticated path. An author registering their own
+ * URL by pasting the manifest is acting rather than being asked, so a past
+ * refusal does not stand in their way.
+ */
+export async function hasRefused(
+  client: Client,
+  authorId: number,
+  manifestUrl: string,
+): Promise<boolean> {
+  const result = await client.execute({
+    sql: `select 1 from registration_refusals
+           where author_id = ? and manifest_url = ?`,
+    args: [authorId, manifestUrl],
+  });
+  return result.rows.length > 0;
+}
+
 /** Take a submission off the queue, once approved or dismissed. */
 export async function removePending(
   client: Client,

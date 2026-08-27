@@ -299,3 +299,40 @@ Deno.test("comparing records with the people you follow needs a session", async 
   assertEquals(response.status, 401);
   assertEquals(response.headers.get("cache-control"), "no-store");
 });
+
+Deno.test("the catalog tells a crawler what game-center is", async () => {
+  const response = await router.fetch(new Request("http://localhost/"));
+  const html = await response.text();
+
+  assertStringIncludes(html, "<title>game-center</title>");
+  assertStringIncludes(html, 'property="og:title"');
+  assertStringIncludes(html, 'property="og:site_name"');
+  // Absolute, and built from the hub's own origin rather than the request's:
+  // behind a proxy the incoming host can be an internal name.
+  assertStringIncludes(html, 'href="https://ga-cen.kbn.one/"');
+  assertStringIncludes(html, 'content="https://ga-cen.kbn.one/"');
+});
+
+Deno.test("asks for a small card when there is no picture", async () => {
+  // A large card with nothing in it is worse than a small one that fits.
+  const response = await router.fetch(new Request("http://localhost/"));
+  const html = await response.text();
+  assertStringIncludes(html, 'name="twitter:card" content="summary"');
+  assertEquals(html.includes('property="og:image"'), false);
+});
+
+Deno.test("a page nobody shares still says which page it is", async () => {
+  const response = await router.fetch(new Request("http://localhost/@nobody"));
+  const html = await response.text();
+  assertStringIncludes(html, "@nobody は見つかりません");
+});
+
+Deno.test("the frame response carries no head to put metadata in", async () => {
+  // The browser is swapping content inside a document it already has.
+  const response = await router.fetch(
+    new Request("http://localhost/", { headers: { "rmx-frame": "1" } }),
+  );
+  const html = await response.text();
+  assertEquals(html.includes("og:title"), false);
+  assertEquals(html.includes("<title>"), false);
+});
