@@ -132,7 +132,10 @@ export class GameCenter {
    * Put it on the page rather than opening it: a link the player chose to
    * follow survives popup blockers and tells them what is about to happen.
    */
-  claimLink(key: string, options: UnlockOptions & { text?: string } = {}) {
+  claimLink(
+    key: string,
+    options: UnlockOptions & { text?: string } = {},
+  ): HTMLAnchorElement {
     const a = document.createElement("a");
     a.href = this.claimUrl(key, options);
     a.target = "_blank";

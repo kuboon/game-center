@@ -1,0 +1,69 @@
+# Publish packages/sdk to JSR.
+#
+# Only that one member. The workspace also holds `@game-center/protocol` and
+# two packages vendored from elsewhere, and `deno publish` from the root would
+# reach for all of them — so this runs in the package's own directory.
+#
+# There is no token. JSR authenticates the workflow itself through OIDC, which
+# is what `id-token: write` below is for, and the package is linked to this
+# repository on jsr.io.
+name: publish sdk
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/sdk/**
+      - .github/workflows/publish-sdk.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+
+      # Publishing a broken package is worse than not publishing: a version on
+      # JSR cannot be replaced, only superseded.
+      - run: deno task check
+      - run: deno test -P packages/sdk
+
+      # JSR refuses a version it already has, and every merge that touches the
+      # SDK would otherwise end in a red workflow that means "nothing to do".
+      # So the version decides: bump it in deno.json and the merge publishes.
+      - name: Decide whether this version is new
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(jq -r .version packages/sdk/deno.json)
+          name=$(jq -r .name packages/sdk/deno.json)
+
+          # Fetched into a variable rather than piped: piping made a failed
+          # request and a package with no versions look identical, and under
+          # `set -o pipefail` a 404 body would take the whole step down.
+          meta=$(curl -sS --fail --max-time 30 \
+            "https://jsr.io/${name}/meta.json") || meta=""
+          has=$(jq -r --arg v "$version" '.versions | has($v)' <<<"$meta" \
+            2>/dev/null) || has=""
+
+          if [ "$has" = "true" ]; then
+            echo "$name@$version is already on JSR. Nothing to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            # Includes the case where JSR could not be reached. Attempting is
+            # the safe direction: JSR is the authority on what exists, and it
+            # refuses a duplicate loudly. Skipping on a failed lookup would
+            # drop a release silently.
+            echo "Publishing $name@$version."
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.version.outputs.publish == 'true'
+        run: deno publish
+        working-directory: packages/sdk

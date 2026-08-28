@@ -18,5 +18,10 @@
       "dom.iterable",
       "esnext"
     ]
+  },
+  "publish": {
+    "exclude": [
+      "mod.test.ts"
+    ]
   }
 }

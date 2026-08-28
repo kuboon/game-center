@@ -194,6 +194,12 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   呼び出し側が `claimLink()` でリンクを出す
 - 起動トークンはフラグメントから読んで localStorage に入れ、アドレスバーから
   消す。401 が返ったら捨てる(以後成功しえないリクエストを待たないため)
+- **JSR に公開する**(`@kuboon/game-center-sdk`)。`packages/sdk` の中で
+  `deno publish` する。ルートから叩くと vendoring した非公開パッケージまで
+  巻き込む。トークンは無い(OIDC)。`deno.json` の `version` を上げて main に
+  入れば公開され、同じ版なら何もしない
+- **JSR は `deno check` より厳しい**。公開 API に明示的な返り値型が要る。 PR の
+  CI で `deno publish --dry-run` を回して、公開時ではなくそこで気づく
 - `lib` はブラウザのものだけ。ゲームに同梱されるファイルに Deno の API が
   紛れないようにする。`deno.ns` を参照するのはテストだけ
 - `/play/@{author}/{slug}` が postMessage の親。**`event.origin` が登録済み
