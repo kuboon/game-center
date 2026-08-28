@@ -33,8 +33,8 @@ const CLIENT_ENTRIES = [
   "play_frame.tsx",
   "follow_button.tsx",
   "catalog_sections.tsx",
-  "player_score.tsx",
   "peer_scores.tsx",
+  "timeline.tsx",
 ] as const;
 
 const OUTPUT_DIR = new URL("../bundled", import.meta.url);

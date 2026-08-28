@@ -1,14 +1,20 @@
 /**
  * GET /dev — the developer dashboard.
  *
- * The shell is server-rendered; everything that depends on who is signed in is
- * the {@link DevConsole} clientEntry, because an SSR request carries no DPoP
+ * The shell is server-rendered; everything that depends on who is signed in —
+ * the {@link PromptCard} with your own author id in it, and the
+ * {@link DevConsole} — is a clientEntry, because an SSR request carries no DPoP
  * proof.
+ *
+ * Registering a game lives here and only here. `/me` is a player's page, and a
+ * player who never publishes anything should not have to scroll past a
+ * developer's tools to reach their own record.
  */
 
 import type { Action } from "@remix-run/fetch-router";
 
 import { DevConsole } from "../../client/dev_console.tsx";
+import { PromptCard } from "../../client/prompt_card.tsx";
 import type { routes } from "../routes.ts";
 import { renderPage } from "../utils/render.tsx";
 
@@ -86,6 +92,8 @@ export const devAction = {
             </p>
           </div>
         </div>
+
+        <PromptCard />
 
         <DevConsole returnTo="/dev" />
       </main>,

@@ -79,6 +79,26 @@ export const authorPageAction = {
             followers={follows.followers}
             followees={follows.followees}
           />
+          {
+            /* The cabinet's score panel, moved to where the score belongs.
+              On the landing page it could only ever show the visitor their
+              own; here it is part of what someone reads before deciding to
+              follow, and it is server-rendered like the rest of the page. */
+          }
+          <dl class="stats stats-horizontal border-base-300 border">
+            <div class="stat px-5 py-3">
+              <dt class="stat-title text-xs">ポイント</dt>
+              <dd class="stat-value text-2xl tabular-nums">{points}</dd>
+            </div>
+            <div class="stat px-5 py-3">
+              <dt class="stat-title text-xs">実績</dt>
+              <dd class="stat-value text-2xl tabular-nums">{unlocks.length}</dd>
+            </div>
+            <div class="stat px-5 py-3">
+              <dt class="stat-title text-xs">ゲーム</dt>
+              <dd class="stat-value text-2xl tabular-nums">{active.length}</dd>
+            </div>
+          </dl>
         </div>
 
         <section class="space-y-3">
@@ -93,12 +113,7 @@ export const authorPageAction = {
         </section>
 
         <section class="space-y-3">
-          <h2 class="text-xl font-bold">
-            解除した実績{" "}
-            {unlocks.length > 0
-              ? `(${unlocks.length} 件 / ${points} ポイント)`
-              : ""}
-          </h2>
+          <h2 class="text-xl font-bold">解除した実績</h2>
           {recent.length === 0
             ? <p class="opacity-70">解除した実績はまだありません。</p>
             : <ul class="space-y-3">{recent.map(unlockRow)}</ul>}
