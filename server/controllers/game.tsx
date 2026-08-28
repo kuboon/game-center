@@ -62,6 +62,11 @@ export const gamePageAction = {
             : null}
           <div class="space-y-1">
             <h1 class="text-3xl font-bold">{game.title}</h1>
+            {
+              /* The display name, not the handle. A handle here is the
+                identifier the IdP issued — unique, stable, and unreadable.
+                It stays in the URL, where it has to be. */
+            }
             {author
               ? (
                 <p class="text-sm opacity-70">
@@ -72,7 +77,7 @@ export const gamePageAction = {
                         href={routes.author.href({ handle: author.handle })}
                         rmx-target="content"
                       >
-                        @{author.handle}
+                        {author.displayName}
                       </a>
                     )
                     : author.displayName}

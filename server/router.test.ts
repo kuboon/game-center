@@ -351,14 +351,13 @@ Deno.test("the landing page reads with no JavaScript and no database", async () 
 });
 
 Deno.test("the landing page ranks nobody", async () => {
-  // The slot an arcade would fill with a high-score table shows the visitor
-  // their own score instead. A table ranking every player is the one place
-  // where forging an unlock would start to pay, and the hub does not have one.
-  // See docs/grand_design.md, "偽装は防がない、代わりに誰を見るかを選ばせる".
+  // The slot an arcade would fill with a high-score table is empty. A table
+  // ranking every player is the one place where forging an unlock would start
+  // to pay, and the hub does not have one — nor a staging post on the way to
+  // one. See docs/grand_design.md, "偽装は防がない、代わりに誰を見るかを選ばせる".
   const html = await (await router.fetch(new Request("http://localhost/")))
     .text();
 
-  assertStringIncludes(html, "YOUR SCORE");
   for (const ranking of ["HIGH SCORE", "1ST", "2ND", "ランキング"]) {
     assertEquals(html.includes(ranking), false, ranking);
   }

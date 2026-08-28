@@ -1,9 +1,13 @@
 /**
  * AccountCard — the /me page's sign-in status, as a `clientEntry`.
  *
- * Shows who the hub thinks you are, the DPoP key thumbprint behind that, and a
- * way in or out. Like the navbar it renders from browser state, because a
- * server-rendered document carries no DPoP proof.
+ * Shows who the hub thinks you are and a way in or out. Like the navbar it
+ * renders from browser state, because a server-rendered document carries no
+ * DPoP proof.
+ *
+ * The DPoP key thumbprint is not shown. It is the session's identifier, it is
+ * of no use to the person reading the page, and printing a credential-shaped
+ * string invites someone to copy it somewhere.
  */
 
 import {
@@ -62,9 +66,6 @@ export const AccountCard = clientEntry(
                     {sessionStore.displayName ?? sessionStore.userId}
                   </span>{" "}
                   としてサインインしています。
-                </p>
-                <p class="text-sm opacity-70 break-all">
-                  DPoP 鍵: <code>{sessionStore.thumbprint}</code>
                 </p>
                 <div class="card-actions">
                   <button

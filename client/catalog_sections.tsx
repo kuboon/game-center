@@ -116,7 +116,7 @@ function card(game: CatalogCard) {
           {author
             ? (
               <a class="link" href={`/@${author}`} rmx-target="content">
-                @{author}
+                {game.authorName}
               </a>
             )
             : game.authorName}

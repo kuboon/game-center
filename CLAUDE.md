@@ -173,11 +173,26 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   戻ってきたら自動でフォローする
 - 意図は `sessionStorage`(`client/follow_intent.ts`)。**戻り先 URL に載せない**
   — 開いた人が黙って誰かをフォローするリンクを配れてしまう。読み出しは一度きり
+- **`/me` の本体はタイムライン**(`server/db/timeline.ts` →
+  `GET /api/internal/timeline` →
+  `client/timeline.tsx`)。フォロー中の人の実績解除と
+  ゲーム登録を新しい順に混ぜて出し、各行からゲームへ飛ばす。フォローの見返りが
+  ここにしか無いので、フォロー機能はこの画面と一組で意味を持つ
+- タイムラインには **イベント表を作らない**。`user_achievements.unlocked_at` と
+  `games.created_at` の union で足りる。ログを別に書くと、それが記述している行と
+  ずれる
+- `hidden` の題名は **SQL を出る前に伏せる**(`toEvent` が `MASKED_TITLE` に
+  差し替える)。ブラウザで隠すのは、送ってしまってから隠すことになる
+- 自分の行はタイムラインに出さない。自分が何をしたかは知っている
 
 ## ハンドル
 
 `users.handle` は公開の名前で、初回サインイン時に **IdP の userId をそのまま**
 入れる(`upsertUser`)。本人に選ばせない。
+
+- **画面に出す名前は `display_name`、`handle` は URL だけ**。handle は IdP が
+  発行した識別子で、読める保証がない。ゲームページの作者行もカタログのカードも
+  表示名を出し、リンク先だけが `/@{handle}` になる
 
 - マニフェストの `author` に書かれ、`/@{handle}` が作者ページ、ゲームの id は
   `{handle}/{slug}`
@@ -192,8 +207,10 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - 検証パターン(`HANDLE_PATTERN`)は URL の unreserved 文字に限るだけの緩いもの。
   UUID でも不透明トークンでも数値でも通る
 
-`/me` の「ゲームを作る AI に渡す」は、作者 ID を埋め込んだ手順一式を
-クリップボードに入れる。識別子を手で写させないため
+`/dev` の「ゲームを作る AI に渡す」は、作者 ID を埋め込んだ手順一式を
+クリップボードに入れる。識別子を手で写させないため。**登録まわりは `/dev` に
+集約する** — `/me` はプレイヤーのページで、公開しない人が開発者向けの道具を
+読み飛ばす場所ではない
 
 ## SDK
 
@@ -238,8 +255,9 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 
 - **ランディングだけ常に暗い**。他のページは道具なので daisyUI テーマに従う
 - `font-dot`(`DotGothic16`)は筐体の文字だけ。日本語の本文には使わない
-- アーケードなら HIGH SCORE 表を置く枠には、**訪問者自身のスコア**を出す
-  (`client/player_score.tsx`)。全ユーザを並べた表は作らない
+- **スコア表は置かない**。全ユーザを並べた表は偽装が割に合いはじめる場所であり、
+  訪問者自身のスコアを出す枠も撤去した(数字は `/@{handle}` にある)。筐体には
+  カタログだけが並ぶ
 - 筐体は SSR とCSS だけで出る。JS を切ってもカタログは読める
 
 ## 実績解除

@@ -7,9 +7,10 @@
  * Still server-rendered from the game list: the catalog is the same for
  * everyone and should be readable, and indexable, with JavaScript switched
  * off. The cabinet is markup and CSS only, so none of it waits on the bundle.
- * The two things that depend on who is looking — the visitor's own score, and
- * the sections built from who they follow — arrive from the browser and are
- * absent until they do.
+ * The one thing that depends on who is looking — the sections built from who
+ * the visitor follows — arrives from the browser and is absent until it does.
+ * Their own record is not here at all: it lives on their profile, which is the
+ * page they would send someone to anyway.
  *
  * This page is dark in both themes. Everything else follows the visitor's
  * daisyUI preference, because everything else is a tool; a cabinet is dark so
@@ -19,7 +20,6 @@
 import type { Action } from "@remix-run/fetch-router";
 
 import { CatalogSections } from "../../client/catalog_sections.tsx";
-import { PlayerScore } from "../../client/player_score.tsx";
 import { getDb } from "../db/client.ts";
 import { type CatalogGame, listCatalogGames } from "../db/games.ts";
 import { routes } from "../routes.ts";
@@ -34,8 +34,6 @@ export const homeAction = {
     // PRESS START goes to the newest game rather than to a menu: the visitor
     // asked to play, and the catalog is right below the fold anyway.
     const newest = games[0];
-    const achievements = games.reduce((n, g) => n + g.achievementCount, 0);
-    const points = games.reduce((n, g) => n + g.totalPoints, 0);
 
     return renderPage(
       context,
@@ -45,9 +43,6 @@ export const homeAction = {
             <div class="mb-4 flex items-center justify-center gap-3 sm:gap-4">
               <span class="animate-bulb bg-arcade-amber size-3 rounded-full shadow-[0_0_14px_currentColor]" />
               <span class="animate-bulb bg-arcade-pink size-3 rounded-full shadow-[0_0_14px_currentColor] [animation-delay:0.3s]" />
-              <span class="font-dot text-arcade-cyan text-xs tracking-[0.3em] sm:text-base">
-                1 PLAYER READY
-              </span>
               <span class="animate-bulb bg-arcade-pink size-3 rounded-full shadow-[0_0_14px_currentColor] [animation-delay:0.6s]" />
               <span class="animate-bulb bg-arcade-amber size-3 rounded-full shadow-[0_0_14px_currentColor] [animation-delay:0.9s]" />
             </div>
@@ -102,40 +97,17 @@ export const homeAction = {
           <CatalogSections />
         </div>
 
-        <section class="mx-auto grid w-full max-w-5xl gap-6 px-4 pb-16 sm:px-8 lg:grid-cols-[1.6fr_1fr]">
-          <div>
-            <h2 class="font-dot text-arcade-amber mb-4 text-lg tracking-[0.12em]">
-              SELECT GAME
-            </h2>
-            {games.length === 0
-              ? emptyCatalog()
-              : (
-                <ul class="grid gap-3 sm:grid-cols-2">
-                  {games.map(gameCard)}
-                </ul>
-              )}
-          </div>
-
-          <aside class="border-arcade-edge bg-arcade-panel h-fit rounded-xl border-2 p-5">
-            <h2 class="font-dot text-arcade-pink mb-4 text-base tracking-[0.12em]">
-              YOUR SCORE
-            </h2>
-            <PlayerScore />
-            <dl class="border-arcade-edge font-dot text-arcade-dim mt-5 flex flex-col gap-2 border-t pt-4 text-xs">
-              <div class="flex justify-between gap-3">
-                <dt>GAMES</dt>
-                <dd class="tabular-nums">{games.length}</dd>
-              </div>
-              <div class="flex justify-between gap-3">
-                <dt>ACHIEVEMENTS</dt>
-                <dd class="tabular-nums">{achievements}</dd>
-              </div>
-              <div class="flex justify-between gap-3">
-                <dt>POINTS ON OFFER</dt>
-                <dd class="tabular-nums">{points}</dd>
-              </div>
-            </dl>
-          </aside>
+        <section class="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-8">
+          <h2 class="font-dot text-arcade-amber mb-4 text-lg tracking-[0.12em]">
+            SELECT GAME
+          </h2>
+          {games.length === 0
+            ? emptyCatalog()
+            : (
+              <ul class="grid gap-3 sm:grid-cols-2">
+                {games.map(gameCard)}
+              </ul>
+            )}
         </section>
       </main>,
       {
@@ -183,7 +155,7 @@ function gameCard(game: CatalogGame) {
         <span class="flex min-w-0 flex-col gap-1">
           <span class="truncate font-bold">{game.title}</span>
           <span class="text-arcade-dim truncate text-xs">
-            {handle ? `@${handle}` : game.authorName}
+            {game.authorName}
           </span>
           {game.description
             ? (

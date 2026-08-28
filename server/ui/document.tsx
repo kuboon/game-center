@@ -97,15 +97,6 @@ export function Document(handle: Handle<DocumentProps>) {
                 GAME CENTER
               </a>
             </div>
-            <div class="navbar-center">
-              <a
-                class="font-dot btn btn-ghost btn-sm text-arcade-dim hover:text-arcade-ink"
-                href={routes.dev.href()}
-                rmx-target="content"
-              >
-                開発者向け
-              </a>
-            </div>
             <div class="navbar-end">
               <NavAuth returnTo={routes.me.href()} />
             </div>
