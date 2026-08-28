@@ -9,7 +9,7 @@
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1.0.19",
-    "@remix-run/ui": "npm:@remix-run/ui@^0.5.0",
+    "@remix-run/ui": "npm:@remix-run/ui@^0.7.0",
     "@kuboon/dpop": "jsr:@kuboon/dpop@^0.2.0"
   }
 }

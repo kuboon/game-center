@@ -44,6 +44,14 @@ deno task db …    # migrate / rollback / status / seed / reset / wipe
 `bundled/` は `deno task bundle` で生成する。 サーバは起動時にこれを
 `staticFiles` で配信するため、`deno task serve` の前にビルドが要る。
 
+- **`codeSplitting` は最適化ではなく正しさの要件**。clientEntry
+  はそれぞれ別のエントリポイントとして bundle されるが、分割を切ると
+  `@remix-run/ui` のランタイムが各ファイルに複製される。ランタイムには
+  モジュールスコープの同一性で値を見分ける箇所があり(`on("click", …)` が付ける
+  `onMixinType` を reconciler が `===` で比較する)、複製されると照合が黙って
+  外れて **イベントリスナが一つも張られない**。hydrate も render も走るので
+  ログにも型検査にも出ない。`bundler/js.test.ts` が複製を見張っている
+
 ## データベース
 
 Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
