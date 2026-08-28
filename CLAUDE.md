@@ -136,7 +136,11 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   タイムアウト。応答の中身は呼び出し元に一切返らない(検証エラーは値ではなく
   フィールド名を返す)ので、残る露出は blind に留まる
 - Claude Artifacts は公開 URL を fetch しても著者の HTML ではなく殻が返るため、
-  貼り付け登録を使う
+  貼り付け登録を使う。**実体のサブドメインを追う手も塞がっている**(403
+  `Couldn't load this Artifact`、セッションが要る)。実測の一覧は
+  docs/grand_design.md にある。`data-frame-uchost` を読む実装は書かない
+- 貼り付けるときはマニフェストに `url` を自分で足す。取得元が無いので
+  `registerFromPaste` がそこだけ必須にしている
 - 検証は `packages/protocol` の `parseManifest()` だけが行う。エラーは最初の
   一件で止めず全部返す。JSON Schema は `GET /schema/gamecenter.json` で配信する
 - マニフェストの `url`
