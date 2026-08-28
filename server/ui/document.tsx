@@ -10,6 +10,12 @@
  * what a crawler finds here is the first thing most people read about
  * game-center. Pages supply their own {@link PageMeta}; the ones nobody shares
  * supply none and get the site's name.
+ *
+ * The navbar wears the arcade marquee rather than the daisyUI theme. It sits
+ * directly above the landing page's cabinet, and a light bar over a dark
+ * cabinet reads as two unrelated pages stitched together. The body keeps the
+ * visitor's theme: everything below this bar except the landing page is a
+ * tool, and tools should follow the preference they set.
  */
 
 import { Frame, type Handle } from "@remix-run/ui";
@@ -65,22 +71,35 @@ export function Document(handle: Handle<DocumentProps>) {
           />
 
           <script async type="module" src="/mod.js"></script>
+          {
+            /* One face, for the cabinet's own lettering. Japanese body text
+              stays on the system stack, where it is far more readable. */
+          }
+          <link
+            rel="preconnect"
+            href="https://fonts.gstatic.com"
+            crossorigin="anonymous"
+          />
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap"
+          />
           <link rel="stylesheet" href="/style.css" />
         </head>
         <body class="min-h-screen bg-base-100 text-base-content">
-          <header class="navbar bg-base-200 shadow-sm">
+          <header class="navbar bg-arcade-shell border-b border-white/10">
             <div class="navbar-start">
               <a
-                class="btn btn-ghost text-xl"
+                class="font-dot btn btn-ghost text-arcade-amber text-lg tracking-[0.08em] sm:text-xl"
                 href={routes.home.href()}
                 rmx-target="content"
               >
-                game-center
+                GAME CENTER
               </a>
             </div>
             <div class="navbar-center">
               <a
-                class="btn btn-ghost btn-sm"
+                class="font-dot btn btn-ghost btn-sm text-arcade-dim hover:text-arcade-ink"
                 href={routes.dev.href()}
                 rmx-target="content"
               >

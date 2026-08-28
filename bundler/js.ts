@@ -17,6 +17,7 @@ const CLIENT_ENTRIES = [
   "play_frame.tsx",
   "follow_button.tsx",
   "catalog_sections.tsx",
+  "player_score.tsx",
   "peer_scores.tsx",
 ] as const;
 

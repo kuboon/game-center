@@ -281,6 +281,51 @@ export async function listGamesWithAuthors(
   return result.rows.map(toGameWithAuthor);
 }
 
+/** A catalog card: the game, its author, and what is on offer inside it. */
+export interface CatalogGame extends GameWithAuthor {
+  readonly achievementCount: number;
+  readonly totalPoints: number;
+}
+
+/**
+ * Every active game with what it is worth — how many achievements it declares
+ * and what they add up to.
+ *
+ * Two statements rather than one per card: the totals are aggregated in a
+ * single group-by and joined in memory, so adding a game does not add a query.
+ *
+ * Retired achievements are left out. They are not something a new player can
+ * still earn, so counting them would advertise points that are no longer on
+ * offer.
+ */
+export async function listCatalogGames(
+  client: Client,
+): Promise<CatalogGame[]> {
+  const games = await listGamesWithAuthors(client);
+  if (games.length === 0) return [];
+
+  const result = await client.execute(
+    `select game_id,
+            count(*) as achievement_count,
+            coalesce(sum(points), 0) as total_points
+       from achievements
+      where retired = 0
+      group by game_id`,
+  );
+  const totals = new Map(
+    result.rows.map((row) => [String(row.game_id), {
+      achievementCount: Number(row.achievement_count),
+      totalPoints: Number(row.total_points),
+    }]),
+  );
+
+  return games.map((game) => ({
+    ...game,
+    achievementCount: totals.get(game.id)?.achievementCount ?? 0,
+    totalPoints: totals.get(game.id)?.totalPoints ?? 0,
+  }));
+}
+
 /**
  * Active games made by the people this player follows, newest first.
  *
