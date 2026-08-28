@@ -310,6 +310,37 @@ Artifacts のゲームは 3(貼り付け)で登録する。
 実体は artifact ごとのサブドメイン `{uuid}.frame.claudeusercontent.com` にあり、これをクライアント側の JavaScript が iframe として差し込む。
 サーバから取得できるのはその差し込みが起きる前の状態なので、script を埋め込んでもハブの取得は届かない。
 
+実体のサブドメインを自分で叩けばよいのでは、と考えたくなるが、**そちらも塞がっている**。
+2026-08-28 に実測した結果を残す。
+
+| 叩いた先 | 返り |
+| --- | --- |
+| `claude.ai/code/artifact/{uuid}` | 200、殻のみ。manifest は入っていない |
+| `{uuid}.frame.claudeusercontent.com/` | 404 |
+| `{uuid}.frame.claudeusercontent.com/_f/{version}/` | 403 `Couldn't load this Artifact` |
+| `{uuid}-top.frame.claudeusercontent.com/` | 404 |
+| `claude.ai/api/frame/{uuid}` | 403(Cloudflare のチャレンジ) |
+| `claude.ai/api/artifacts/{uuid}` | 403 |
+| `claude.ai/public/artifacts/{uuid}` | 200、SPA の殻。manifest は入っていない |
+
+フレームホストの 403 は `<script>parent.postMessage({__frame_denied:true},"*")</script>` を返し、
+`content-security-policy: frame-ancestors 'self' https://claude.ai https://*.claude.ai` が付く。
+**セッションを持たない相手には中身を出さない**設計である。
+
+殻のローダも読んだ。
+org(クッキー `lastActiveOrg` か `?org=`)が無ければ `if(!r)return` でフェッチ自体を始めず、
+実際の取得は `/api/frame/{uuid}` への same-origin + credentials である。
+共有キー `sk` を受け取る口はあるが、公開 URL には付かない。
+
+したがって **`data-frame-uchost` を読んで iframe を追う実装を書いても、本番では必ず 403 になる。**
+書けば動くコードではなく、書いても動かないコードなので、書かない。
+
+一つだけ未検証なのは `claude.site/artifacts/{uuid}` で、
+調査したコンテナのプロキシがそのホストを塞いでいたため叩けていない。
+
+なお、貼り付けるときは `url` を自分で足す必要がある。
+取得元が無い以上ゲームの場所を誰も知らないので、`registerFromPaste` がそこだけ必須にしている。
+
 登録は開発時の一度きりの行為なので、貼り付けで足りる。
 解除は claim URL で動くため、実行時に困ることはない。
 
