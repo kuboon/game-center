@@ -52,8 +52,21 @@ runs:
             # to approve the URL once; every push after that goes straight
             # through. Failing here would make every new game's first CI run
             # red for a reason nothing is wrong with.
+            #
+            # But a green run that registered nothing is the one outcome that
+            # has to be hard to miss, and an annotation on a green job is easy
+            # to miss. So it also goes on the run summary, with the address of
+            # the page that finishes the job.
             echo "status=pending" >> "$GITHUB_OUTPUT"
             echo "::notice::$(jq -r '.message' "$body")"
+            {
+              echo "### game-center: 承認待ち"
+              echo
+              echo "**$(jq -r '.game.id' "$body")** はまだ登録されていません。"
+              echo "作者本人が [$HUB/dev]($HUB/dev) で一度だけ承認する必要があります。"
+              echo
+              echo "承認は最初の一度きりで、以後この URL からの push はそのまま通ります。"
+            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
             ;;
           400)
             echo "::error::gamecenter.json is not valid"
