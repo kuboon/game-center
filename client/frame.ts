@@ -7,7 +7,15 @@
 
 import type { ResolveFrameOptions } from "@remix-run/ui";
 
+/**
+ * Request headers the hub invented, not `@remix-run/ui`'s DOM attributes.
+ *
+ * `ui@0.8.0` renamed every `rmx-*` attribute to `data-rmx-*`; these two are
+ * HTTP header names both ends of this app agree on, and renaming them would
+ * only make the server stop recognizing its own requests.
+ */
 export const FRAME_HEADER = "rmx-frame";
+export const TARGET_HEADER = "rmx-target";
 
 /** Fetch options a frame load turns into, split out so tests can assert them. */
 export function frameRequestInit(options?: ResolveFrameOptions): RequestInit {
@@ -15,7 +23,7 @@ export function frameRequestInit(options?: ResolveFrameOptions): RequestInit {
     accept: "text/html",
     [FRAME_HEADER]: "1",
   });
-  if (options?.target) headers.set("rmx-target", options.target);
+  if (options?.target) headers.set(TARGET_HEADER, options.target);
   return { headers, signal: options?.signal };
 }
 

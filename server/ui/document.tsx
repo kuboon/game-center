@@ -2,7 +2,7 @@
  * Document — the persistent HTML shell (navbar + `<Frame name="content">`).
  *
  * Client-side, `run()` (bundled from client/mod.ts) hydrates every clientEntry
- * marker and turns clicks on `<a rmx-target="content">` into frame swaps
+ * marker and turns clicks on `<a data-rmx-target="content">` into frame swaps
  * instead of full document navigations.
  *
  * The head is where a shared link becomes a card. The hub's main way of
@@ -92,7 +92,7 @@ export function Document(handle: Handle<DocumentProps>) {
               <a
                 class="font-dot btn btn-ghost text-arcade-amber text-lg tracking-[0.08em] sm:text-xl"
                 href={routes.home.href()}
-                rmx-target="content"
+                data-rmx-target="content"
               >
                 GAME CENTER
               </a>

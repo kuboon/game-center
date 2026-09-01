@@ -40,16 +40,25 @@ const CLIENT_ENTRIES = [
 const OUTPUT_DIR = new URL("../bundled", import.meta.url);
 
 /**
- * Drop generated chunks before a build.
+ * Drop every generated `.js` before a build.
  *
- * Chunk names carry a content hash, so a stale one is never overwritten — it
- * just accumulates in `bundled/` and gets deployed forever. The named entry
- * files are rewritten every build, so only the chunks need clearing.
+ * Two ways a file outlives what produced it. A chunk name carries a content
+ * hash, so a stale one is never overwritten; and an entry removed from
+ * `CLIENT_ENTRIES` leaves its `.js` behind, still importing chunks that no
+ * longer exist. Both then sit in `bundled/` and get deployed, and the second
+ * one also breaks `deno check` locally — CI never sees it, because CI builds
+ * into an empty directory.
+ *
+ * Only `.js` and its sourcemaps: `style.css` and `llms.txt` live here too and
+ * belong to other builders.
  */
-async function clearStaleChunks() {
+async function clearJsOutput() {
   try {
     for await (const entry of Deno.readDir(OUTPUT_DIR)) {
-      if (!entry.isFile || !entry.name.startsWith("chunk-")) continue;
+      if (!entry.isFile) continue;
+      if (!entry.name.endsWith(".js") && !entry.name.endsWith(".js.map")) {
+        continue;
+      }
       await Deno.remove(new URL(entry.name, `${OUTPUT_DIR}/`));
     }
   } catch (cause) {
@@ -60,7 +69,7 @@ async function clearStaleChunks() {
 export async function buildJs(
   { minify = false, write = true }: { minify?: boolean; write?: boolean } = {},
 ) {
-  if (write) await clearStaleChunks();
+  if (write) await clearJsOutput();
   const entrypoints = CLIENT_ENTRIES.map((p) =>
     import.meta.resolve(`../client/${p}`)
   );

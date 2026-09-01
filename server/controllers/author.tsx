@@ -46,7 +46,7 @@ export const authorPageAction = {
           <h1 class="text-3xl font-bold">この作者は見つかりません</h1>
           <p>
             <code>@{handle}</code> という作者はいません。{" "}
-            <a class="link" href={routes.home.href()} rmx-target="content">
+            <a class="link" href={routes.home.href()} data-rmx-target="content">
               カタログに戻る
             </a>
             。
@@ -146,7 +146,7 @@ function gameRow(
       <a
         class="link link-hover font-bold"
         href={routes.game.href({ handle, slug: game.slug })}
-        rmx-target="content"
+        data-rmx-target="content"
       >
         {game.title}
       </a>
@@ -188,7 +188,7 @@ function unlockRow(unlock: Unlock) {
                 handle: ref.author,
                 slug: ref.slug,
               })}
-              rmx-target="content"
+              data-rmx-target="content"
             >
               {unlock.gameTitle}
             </a>

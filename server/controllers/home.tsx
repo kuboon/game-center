@@ -72,14 +72,14 @@ export const homeAction = {
                         slug: newest.slug,
                       })
                       : routes.dev.href()}
-                    rmx-target="content"
+                    data-rmx-target="content"
                   >
                     PRESS START
                   </a>
                   <a
                     class="font-dot text-arcade-ink hover:border-arcade-cyan hover:text-arcade-cyan w-full rounded-xl border-2 border-white/20 px-7 py-4 text-center text-lg transition sm:w-auto"
                     href={routes.dev.href()}
-                    rmx-target="content"
+                    data-rmx-target="content"
                   >
                     ゲームを登録
                   </a>
@@ -137,7 +137,7 @@ function gameCard(game: CatalogGame) {
       <a
         class="flex gap-4 p-4"
         href={routes.game.href({ handle: handle ?? "", slug: game.slug })}
-        rmx-target="content"
+        data-rmx-target="content"
       >
         {game.iconUrl
           ? (
@@ -185,7 +185,7 @@ function emptyCatalog() {
         <a
           class="text-arcade-amber underline"
           href={routes.dev.href()}
-          rmx-target="content"
+          data-rmx-target="content"
         >
           開発者向けページ
         </a>{" "}

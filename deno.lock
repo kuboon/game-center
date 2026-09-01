@@ -22,7 +22,7 @@
     "npm:@remix-run/response@0.3.8": "0.3.8",
     "npm:@remix-run/session@~0.4.2": "0.4.2",
     "npm:@remix-run/static-middleware@0.4.14": "0.4.14",
-    "npm:@remix-run/ui@0.7": "0.7.0",
+    "npm:@remix-run/ui@0.8": "0.8.0",
     "npm:@tailwindcss/oxide@^4.1.18": "4.3.3",
     "npm:daisyui@^5.5.19": "5.7.17",
     "npm:lightningcss@^1.33.0": "1.33.0",
@@ -257,8 +257,8 @@
         "@remix-run/response"
       ]
     },
-    "@remix-run/ui@0.7.0": {
-      "integrity": "sha512-SPgbmHOnHAGxZiyJhW7wxGBnk7lYdY5GlYj1Chj5hpHH+3IAChpCcwUwniqbN8Wddwf6G4oitN/YhGFarqPIUg==",
+    "@remix-run/ui@0.8.0": {
+      "integrity": "sha512-4OdZ3oj0zbyVVaCFT/x2vjK5YxpD63KpLONkLZ2QVKIEBcLjJUGSenp2f08BOzC8oythLHCJgzHLKKulYJpIQA==",
       "dependencies": [
         "@types/dom-navigation"
       ]
@@ -503,7 +503,7 @@
         "dependencies": [
           "jsr:@kuboon/dpop@0.2",
           "jsr:@std/assert@^1.0.19",
-          "npm:@remix-run/ui@0.7"
+          "npm:@remix-run/ui@0.8"
         ]
       },
       "packages/dpop_session_middleware": {
@@ -546,7 +546,7 @@
           "npm:@remix-run/response@0.3.8",
           "npm:@remix-run/session@~0.4.2",
           "npm:@remix-run/static-middleware@0.4.14",
-          "npm:@remix-run/ui@0.7"
+          "npm:@remix-run/ui@0.8"
         ]
       },
       "tests": {
