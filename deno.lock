@@ -21,7 +21,7 @@
     "npm:@remix-run/fetch-router@0.21.0": "0.21.0",
     "npm:@remix-run/response@0.3.8": "0.3.8",
     "npm:@remix-run/session@~0.4.2": "0.4.2",
-    "npm:@remix-run/static-middleware@0.4.13": "0.4.13",
+    "npm:@remix-run/static-middleware@0.4.14": "0.4.14",
     "npm:@remix-run/ui@0.7": "0.7.0",
     "npm:@tailwindcss/oxide@^4.1.18": "4.3.3",
     "npm:daisyui@^5.5.19": "5.7.17",
@@ -205,16 +205,10 @@
     "@remix-run/data-table@0.4.0": {
       "integrity": "sha512-Flh2PP85hhjNZikxaQvdsrgna3Qv1OWJ/l7RTAKD+K9YdpVL+VnJMOKjyiMzehNBPuCVZB9ST7dF+5A/nfVXtg=="
     },
-    "@remix-run/fetch-router@0.20.1": {
-      "integrity": "sha512-vxlIu4LHY5KyqOdlXFjJeUefUJxgc7499/cSsBl2bzhQnU5DayPHN/dklBOiG+U7GIYQMmObAinmubkwzaXyuw==",
-      "dependencies": [
-        "@remix-run/route-pattern@0.23.0"
-      ]
-    },
     "@remix-run/fetch-router@0.21.0": {
       "integrity": "sha512-dN3Lsd4dHAV0USTF3Dm04effXcdr7GMgXiqeozTFDfvVIx2DbRAl94bwF6UdAWurgTOK2Oyz4cs9uadW/ylWXA==",
       "dependencies": [
-        "@remix-run/route-pattern@0.24.0"
+        "@remix-run/route-pattern"
       ]
     },
     "@remix-run/fs@0.4.6": {
@@ -247,19 +241,16 @@
         "@remix-run/mime"
       ]
     },
-    "@remix-run/route-pattern@0.23.0": {
-      "integrity": "sha512-8eZfG9owfdvC1OqWemjyIqbFTjWbKTW8RrcbppXrnv1GHMIpFOQx9Ly6F1OXNM03aK1c923JypacoRjamyfVEw=="
-    },
     "@remix-run/route-pattern@0.24.0": {
       "integrity": "sha512-w0/lhgY40l2GrBQjJIOeYWIuKm1rxlOsc9Hvt+nyydnka0v4aI9Vv0VK4XzLD3aP08JzGtTlxFxwf1PZ8SGdLg=="
     },
     "@remix-run/session@0.4.2": {
       "integrity": "sha512-NGzu6/gC5xD/tq40W0WqzTt4JhCdSCIwDHM1aa13JBqb4Ml/Mb0kmXqjfOe/gBYfu6AA11nRQ/BJyr+VduTodA=="
     },
-    "@remix-run/static-middleware@0.4.13": {
-      "integrity": "sha512-32oI2hbVR+GN/sduxOZSY1WNaEasKDm7X7o79eBGG5E78dV5mi0ijGLldHfAEazyRQyqeYzvG292RWUfkFJetA==",
+    "@remix-run/static-middleware@0.4.14": {
+      "integrity": "sha512-kfz94iBjwFTeORQjs/V/9Pp4pAfJAz9EGlDB7Sh9VvAbG8wggsPs84pFgIIm5xy6Os7ey9OEeQXeLSm70TIzQg==",
       "dependencies": [
-        "@remix-run/fetch-router@0.20.1",
+        "@remix-run/fetch-router",
         "@remix-run/fs",
         "@remix-run/html-template",
         "@remix-run/mime",
@@ -554,7 +545,7 @@
           "npm:@remix-run/fetch-router@0.21.0",
           "npm:@remix-run/response@0.3.8",
           "npm:@remix-run/session@~0.4.2",
-          "npm:@remix-run/static-middleware@0.4.13",
+          "npm:@remix-run/static-middleware@0.4.14",
           "npm:@remix-run/ui@0.7"
         ]
       },
