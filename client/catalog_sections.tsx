@@ -106,7 +106,7 @@ function card(game: CatalogCard) {
           <a
             class="link link-hover"
             href={`/@${author ?? ""}/${game.slug}`}
-            rmx-target="content"
+            data-rmx-target="content"
           >
             {game.title}
           </a>
@@ -115,7 +115,7 @@ function card(game: CatalogCard) {
         <p class="text-sm opacity-70">
           {author
             ? (
-              <a class="link" href={`/@${author}`} rmx-target="content">
+              <a class="link" href={`/@${author}`} data-rmx-target="content">
                 {game.authorName}
               </a>
             )

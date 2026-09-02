@@ -108,7 +108,11 @@ function row(event: TimelineEvent) {
     : null;
   const gameLink = gameHref
     ? (
-      <a class="link link-hover font-bold" href={gameHref} rmx-target="content">
+      <a
+        class="link link-hover font-bold"
+        href={gameHref}
+        data-rmx-target="content"
+      >
         {event.gameTitle}
       </a>
     )
@@ -120,7 +124,7 @@ function row(event: TimelineEvent) {
       class="border-base-300 border-t pt-4"
     >
       <p class="text-sm opacity-70">
-        <a class="link" href={`/@${event.handle}`} rmx-target="content">
+        <a class="link" href={`/@${event.handle}`} data-rmx-target="content">
           {event.displayName}
         </a>
         {event.kind === "game" ? " がゲームを登録しました" : " が実績を解除"}

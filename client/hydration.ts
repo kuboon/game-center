@@ -6,7 +6,7 @@
  *
  * `run()` walks the document, hydrates every `clientEntry` marker emitted by
  * `renderToStream`, and wires the `<Frame name="content">` region so clicks on
- * `<a rmx-target="content">` swap the frame instead of navigating.
+ * `<a data-rmx-target="content">` swap the frame instead of navigating.
  */
 
 import { run } from "@remix-run/ui";

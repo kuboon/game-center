@@ -88,7 +88,7 @@ export const AchievementList = clientEntry(
         return (
           <p>
             まだ実績はありません。{" "}
-            <a class="link" href="/" rmx-target="content">カタログ</a>{" "}
+            <a class="link" href="/" data-rmx-target="content">カタログ</a>{" "}
             からゲームを選んでみてください。
           </p>
         );
@@ -123,7 +123,7 @@ export const AchievementList = clientEntry(
                   <a
                     class="link"
                     href={`/@${unlock.gameId}`}
-                    rmx-target="content"
+                    data-rmx-target="content"
                   >
                     {unlock.gameTitle}
                   </a>{" "}

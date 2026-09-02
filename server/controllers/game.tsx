@@ -33,7 +33,7 @@ export const gamePageAction = {
           <h1 class="text-3xl font-bold">ゲームが見つかりません</h1>
           <p>
             <code>@{ref}</code> は登録されていません。{" "}
-            <a class="link" href={routes.home.href()} rmx-target="content">
+            <a class="link" href={routes.home.href()} data-rmx-target="content">
               カタログ
             </a>{" "}
             に戻る。
@@ -75,7 +75,7 @@ export const gamePageAction = {
                       <a
                         class="link"
                         href={routes.author.href({ handle: author.handle })}
-                        rmx-target="content"
+                        data-rmx-target="content"
                       >
                         {author.displayName}
                       </a>
@@ -95,7 +95,7 @@ export const gamePageAction = {
             <a
               class="link"
               href={routes.play.href({ handle, slug })}
-              rmx-target="content"
+              data-rmx-target="content"
             >
               ハブの中で遊ぶ
             </a>{" "}

@@ -132,7 +132,7 @@ function entry(record: Entry) {
         <a
           class="link link-hover"
           href={`/@${record.handle}`}
-          rmx-target="content"
+          data-rmx-target="content"
         >
           {record.displayName}
         </a>

@@ -40,7 +40,7 @@ export const claimPageAction = {
             は登録されていないか、すでに廃止されています。
             ゲーム側のマニフェストが更新されている可能性があります。
           </p>
-          <a class="link" href={routes.home.href()} rmx-target="content">
+          <a class="link" href={routes.home.href()} data-rmx-target="content">
             カタログに戻る
           </a>
         </main>,
@@ -64,7 +64,7 @@ export const claimPageAction = {
               <a
                 class="link"
                 href={routes.game.href({ handle, slug })}
-                rmx-target="content"
+                data-rmx-target="content"
               >
                 {game.title}
               </a>

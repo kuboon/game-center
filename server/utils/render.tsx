@@ -16,7 +16,15 @@ import { renderToStream } from "@remix-run/ui/server";
 import { Document } from "../ui/document.tsx";
 import { absoluteUrl, type PageMeta } from "../ui/page_meta.ts";
 
+/**
+ * Request headers the hub invented, not `@remix-run/ui`'s DOM attributes.
+ *
+ * `ui@0.8.0` renamed every `rmx-*` attribute to `data-rmx-*`; these two are
+ * HTTP header names both ends of this app agree on, and renaming them would
+ * only make this router stop recognizing its own requests.
+ */
 export const FRAME_HEADER = "rmx-frame";
+export const TARGET_HEADER = "rmx-target";
 
 export const isFrameRequest = (request: Request): boolean =>
   request.headers.get(FRAME_HEADER) === "1";
@@ -90,7 +98,7 @@ async function resolveFrameViaRouter(
     accept: "text/html",
     [FRAME_HEADER]: "1",
   });
-  if (target) headers.set("rmx-target", target);
+  if (target) headers.set(TARGET_HEADER, target);
 
   const response = await router.fetch(
     new Request(url, { method: "GET", headers, signal: request.signal }),

@@ -317,7 +317,7 @@ export const DevConsole = clientEntry(
                     {" "}
                     です。マニフェストの <code>author</code>{" "}
                     にこれを書きます。 AI に渡す手順一式は{" "}
-                    <a class="link" href="/me" rmx-target="content">
+                    <a class="link" href="/me" data-rmx-target="content">
                       マイページ
                     </a>{" "}
                     からコピーできます。

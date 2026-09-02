@@ -46,7 +46,7 @@ export const meAction = {
 
         <p class="text-sm opacity-70">
           ゲームを登録するには{" "}
-          <a class="link" href={routes.dev.href()} rmx-target="content">
+          <a class="link" href={routes.dev.href()} data-rmx-target="content">
             開発者向けページ
           </a>
           へ。

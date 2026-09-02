@@ -61,7 +61,7 @@ export const NavAuth = clientEntry(
         <a
           class="btn btn-ghost btn-sm text-arcade-ink max-w-40"
           href="/me"
-          rmx-target="content"
+          data-rmx-target="content"
         >
           <span class="truncate">
             {sessionStore.displayName ?? sessionStore.userId}

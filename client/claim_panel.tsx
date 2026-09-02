@@ -112,7 +112,11 @@ export const ClaimPanel = clientEntry(
                 ? `ハイスコアを ${done.unlock?.score} に更新しました`
                 : "この実績はすでに解除済みです"}
             </div>
-            <a class="btn btn-outline btn-sm" href="/me" rmx-target="content">
+            <a
+              class="btn btn-outline btn-sm"
+              href="/me"
+              data-rmx-target="content"
+            >
               自分の実績を見る
             </a>
           </div>
