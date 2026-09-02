@@ -35,6 +35,7 @@ const CLIENT_ENTRIES = [
   "catalog_sections.tsx",
   "peer_scores.tsx",
   "timeline.tsx",
+  "followers.tsx",
 ] as const;
 
 const OUTPUT_DIR = new URL("../bundled", import.meta.url);
