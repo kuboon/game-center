@@ -1,0 +1,17 @@
+-- When each player last looked at who follows them.
+--
+-- Being followed is the one thing that happens *to* a player rather than
+-- because of something they did, so it is the one thing they cannot find by
+-- retracing their own steps. Without a mark of what has already been seen,
+-- the hub can show a follower count but never "this is new", which is the
+-- only part that makes anyone look.
+--
+-- A column rather than a table, and a timestamp rather than a set of ids: what
+-- is new is `follows.created_at > users.followers_seen_at`, which the rows
+-- already answer. A per-follower "read" flag would be a second copy of a fact
+-- `follows` already carries, and the two would drift.
+--
+-- Null means "never looked", which is what every existing player is. Their
+-- current followers are all new the first time they open the page — right for
+-- someone who has never been shown any of them.
+alter table users add column followers_seen_at text;

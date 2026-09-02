@@ -53,6 +53,14 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
   displayName: string | null = null;
   /** True once the initial probe has resolved, successfully or not. */
   ready = false;
+  /**
+   * Followers who arrived since this player last looked, or null until asked.
+   *
+   * Lives here rather than in a component because two of them need the same
+   * number: the navbar draws a dot from it, and the `/me` list clears it after
+   * showing the names. The store is the one thing both already share.
+   */
+  unseenFollowers: number | null = null;
 
   #loading?: Promise<void>;
 
@@ -79,6 +87,20 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
     })());
   }
 
+  /**
+   * Publish a new unseen-follower count to everyone rendering from it.
+   *
+   * Whoever learned the number sets it — the navbar after asking the hub, the
+   * `/me` list after marking them seen. Nothing here fetches, because the two
+   * callers want different things from the same endpoint and neither should
+   * pay for the other's.
+   */
+  setUnseenFollowers(count: number): void {
+    if (this.unseenFollowers === count) return;
+    this.unseenFollowers = count;
+    this.#emitChange();
+  }
+
   /** Send the browser to the IdP to authenticate, then back to `returnTo`. */
   signIn(returnTo: string): void {
     const params = new URLSearchParams({
@@ -94,6 +116,8 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
     await this.fetchDpop(`${IDP_ORIGIN}/session/logout`, { method: "POST" });
     this.userId = null;
     this.displayName = null;
+    // Somebody else's badge is not this browser's to keep showing.
+    this.unseenFollowers = null;
     this.#emitChange();
   }
 

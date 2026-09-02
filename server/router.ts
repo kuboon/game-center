@@ -22,6 +22,10 @@ import {
   gameUnlockAction,
 } from "./controllers/api/game.ts";
 import { internalCatalogAction } from "./controllers/api/internal_catalog.ts";
+import {
+  internalFollowersAction,
+  internalFollowersSeenAction,
+} from "./controllers/api/internal_followers.ts";
 import { internalTimelineAction } from "./controllers/api/internal_timeline.ts";
 import {
   internalFollowAction,
@@ -74,6 +78,8 @@ router.post(routes.internalFollow, internalFollowAction);
 router.delete(routes.internalUnfollow, internalUnfollowAction);
 router.get(routes.internalFollowState, internalFollowStateAction);
 router.get(routes.internalCatalog, internalCatalogAction);
+router.get(routes.internalFollowers, internalFollowersAction);
+router.post(routes.internalFollowersSeen, internalFollowersSeenAction);
 router.get(routes.internalTimeline, internalTimelineAction);
 router.get(routes.internalGamePeers, internalGamePeersAction);
 
