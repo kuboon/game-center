@@ -306,6 +306,12 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   `@remix-run/ui@0.8.0` で `rmx-*` から改名された。エイリアスも警告も無く、
   TypeScript はハイフンを含む JSX 属性名を検査しないので、古い綴りを書いても
   ビルドは通り、URL だけ変わって画面が変わらない、という壊れ方をする
+- **フラグメントを要求するのは名前付きフレームだけ**(`client/frame.ts`)。
+  ランタイムは再読み込みするフレーム自身の名前を `target` に渡すので、 `target`
+  が無い＝トップフレーム＝ドキュメント全体の再読み込みであり、
+  返すべきはシェルである。ここでフラグメントを返すと、ブラウザの「戻る」で
+  最初の履歴エントリ(ランタイムが `target` 無しで積む)に戻ったときに URL
+  だけ変わって画面が変わらない。`client/frame.test.ts` が見張っている
 - ただし **`rmx-frame` と `rmx-target` の「ヘッダ」は改名しない**
   (`server/utils/render.tsx` と `client/frame.ts` の `FRAME_HEADER` /
   `TARGET_HEADER`)。これはハブが自分で決めた HTTP ヘッダ名であって
