@@ -36,13 +36,30 @@ export type FetchDpop = (
 type SessionEventMap = { change: Event };
 
 /**
- * How long to wait for the IdP before deciding this browser is signed out.
+ * How long the *first* probe gets before the page stops waiting for it.
  *
- * Generous enough for a slow phone on a bad connection, short enough that a
- * page whose IdP is down still becomes usable rather than sitting on a
- * spinner.
+ * Measured rather than guessed: `GET {IdP}/session` answers in 0.55–2.3s,
+ * the TLS handshake being most of it. A longer deadline buys nothing on a
+ * healthy path — it only decides how long a page sits half-drawn when the IdP
+ * has gone quiet, and that page is usually `/@{handle}`, reached from a link
+ * somebody posted.
+ *
+ * It is deliberately short because it is no longer the last word: an
+ * inconclusive probe is retried in the background, so the page renders as
+ * signed-out promptly and corrects itself if an answer turns up.
  */
-const IDP_PROBE_TIMEOUT_MS = 8_000;
+const FIRST_PROBE_TIMEOUT_MS = 2_500;
+
+/**
+ * When to try again after an inconclusive first probe, and how long to wait
+ * each time.
+ *
+ * Two attempts, then stop. This is for an IdP that is slow or briefly
+ * unreachable; one that is down stays down, and asking forever would just burn
+ * a phone's battery on a page that already works.
+ */
+const RETRY_DELAYS_MS = [1_000, 5_000];
+const RETRY_TIMEOUT_MS = 8_000;
 
 /** What the IdP's `/session` answers a signed-in browser. */
 interface IdpSession {
@@ -91,25 +108,55 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
    * That last case is the one that matters. Every signed-in control on this
    * hub waits on {@link ready}, and so does every *signed-out* one — the
    * "サインインしてフォロー" button on a profile page is drawn only once the
-   * probe has come back saying nobody is signed in. A probe with no deadline
-   * therefore does not merely delay the answer, it removes the button from the
-   * page a visitor arrived at from somebody's link, which is the single most
-   * important thing on it.
+   * probe has come back saying nobody is signed in. A probe that does not
+   * finish therefore does not merely delay the answer, it removes the button
+   * from the page a visitor arrived at from somebody's link, which is the
+   * single most important thing on it.
+   *
+   * So the first probe is given a short deadline and the page carries on
+   * without it. An answer that never came is not the same as "signed out",
+   * though, so it is asked for again in the background — the page starts
+   * usable and becomes correct, instead of trading one for the other.
    */
   load(): Promise<void> {
     return (this.#loading ??= (async () => {
+      let answered = false;
       try {
         const { fetchDpop, thumbprint } = await init();
         this.fetchDpop = fetchDpop;
         this.thumbprint = thumbprint;
-        await this.#adoptIdpSession();
+        answered = await this.#adoptIdpSession(FIRST_PROBE_TIMEOUT_MS);
       } catch {
-        // No DPoP (no IndexedDB, blocked storage): stay signed out but ready.
+        // No DPoP (no IndexedDB, blocked storage). Nothing to retry: this
+        // browser cannot hold a session at all.
+        answered = true;
       } finally {
         this.ready = true;
         this.#emitChange();
       }
+      if (!answered) void this.#retryProbe();
     })());
+  }
+
+  /**
+   * Ask again, after the page is already usable.
+   *
+   * Only reached when the first probe was inconclusive — a timeout or a
+   * network error, never a plain 401, which is a definite "signed out" and
+   * needs no second opinion.
+   */
+  async #retryProbe(): Promise<void> {
+    for (const delay of RETRY_DELAYS_MS) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      // Signing in during the wait settles the question by itself.
+      if (this.userId) return;
+      if (await this.#adoptIdpSession(RETRY_TIMEOUT_MS)) {
+        // A late session is worth telling everyone about; a late "signed out"
+        // is what the page is already showing.
+        if (this.userId) this.#emitChange();
+        return;
+      }
+    }
   }
 
   /**
@@ -152,40 +199,50 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
    *
    * The hub is what actually decides we are signed in — it verifies the token's
    * signature and key binding — so a failure here leaves us signed out.
+   *
+   * @param timeoutMs How long to wait for the IdP
+   * @returns True when the round trip reached a conclusion, either way. False
+   * means nobody answered, which is the one case worth asking again.
    */
-  async #adoptIdpSession(): Promise<void> {
-    if (!this.fetchDpop) return;
+  async #adoptIdpSession(timeoutMs: number): Promise<boolean> {
+    if (!this.fetchDpop) return true;
     let session: IdpSession;
     try {
       const response = await this.fetchDpop(`${IDP_ORIGIN}/session`, {
-        signal: AbortSignal.timeout(IDP_PROBE_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
-      if (!response.ok) return;
+      // A 401 is the IdP saying nobody is signed in. That is an answer.
+      if (!response.ok) return true;
       session = await response.json() as IdpSession;
     } catch {
-      // Signed out, or the IdP did not answer in time. Both mean the same
-      // thing to the page: carry on without a session. A visitor who was in
-      // fact signed in gets a sign-in button that signs them straight back in,
-      // which is recoverable; a page that never finishes loading is not.
-      return;
+      // Timed out, or the request never left. Not an answer.
+      return false;
     }
-    if (!session.userId || !session.jws) return;
+    if (!session.userId || !session.jws) return true;
 
-    const response = await this.fetchDpop("/api/internal/session", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jws: session.jws }),
-    });
-    if (!response.ok) return;
+    try {
+      const response = await this.fetchDpop("/api/internal/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jws: session.jws }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!response.ok) return true;
 
-    const hub = await response.json() as {
-      userId: string;
-      displayName: string;
-      handle: string | null;
-    };
-    this.userId = hub.userId;
-    this.displayName = hub.displayName;
-    this.handle = hub.handle;
+      const hub = await response.json() as {
+        userId: string;
+        displayName: string;
+        handle: string | null;
+      };
+      this.userId = hub.userId;
+      this.displayName = hub.displayName;
+      this.handle = hub.handle;
+      return true;
+    } catch {
+      // The IdP vouched for this browser but the hub did not answer. Worth
+      // asking again: the identity token is still good.
+      return false;
+    }
   }
 
   #emitChange(): void {
