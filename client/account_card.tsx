@@ -1,9 +1,9 @@
 /**
  * AccountCard — the /me page's sign-in status, as a `clientEntry`.
  *
- * Shows who the hub thinks you are and a way in or out. Like the navbar it
- * renders from browser state, because a server-rendered document carries no
- * DPoP proof.
+ * Shows who the hub thinks you are, the way to your own public page, and a way
+ * in or out. Like the navbar it renders from browser state, because a
+ * server-rendered document carries no DPoP proof.
  *
  * The DPoP key thumbprint is not shown. It is the session's identifier, it is
  * of no use to the person reading the page, and printing a credential-shaped
@@ -67,6 +67,27 @@ export const AccountCard = clientEntry(
                   </span>{" "}
                   としてサインインしています。
                 </p>
+                {
+                  /* The public page, and the URL an author posts elsewhere —
+                    which is the whole way anyone arrives here. Worth naming as
+                    such rather than leaving it to be discovered. */
+                }
+                {sessionStore.handle
+                  ? (
+                    <p class="text-sm">
+                      <a
+                        class="link"
+                        href={`/@${sessionStore.handle}`}
+                        data-rmx-target="content"
+                      >
+                        公開プロフィールを見る
+                      </a>{" "}
+                      <span class="opacity-70">
+                        — この URL を貼ると、見た人がフォローできます
+                      </span>
+                    </p>
+                  )
+                  : null}
                 <div class="card-actions">
                   <button
                     type="button"
