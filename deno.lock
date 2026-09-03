@@ -2,6 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@deno/loader@0.5": "0.5.0",
+    "jsr:@kuboon/browser-how-to@0.1": "0.1.0",
     "jsr:@kuboon/dpop@0.2": "0.2.0",
     "jsr:@kuboon/kv@0.2": "0.2.0",
     "jsr:@kuboon/remix-data-table-sqlite-turso@0.3": "0.3.0",
@@ -34,6 +35,9 @@
   "jsr": {
     "@deno/loader@0.5.0": {
       "integrity": "a6d94408de5e6bacac404f8f6963c8b8cc278cfd1a878aa2f06b34a083d6bfee"
+    },
+    "@kuboon/browser-how-to@0.1.0": {
+      "integrity": "d8aa160f10b7b1e1c0be61d1c841aa25087c9488d8741e05478f8f40fbea535a"
     },
     "@kuboon/dpop@0.2.0": {
       "integrity": "df4fcec89be1f125a8934147149303ee0d9dadf6d2bd2d9aa829e0eb182d25aa",
@@ -501,6 +505,7 @@
       },
       "client": {
         "dependencies": [
+          "jsr:@kuboon/browser-how-to@0.1",
           "jsr:@kuboon/dpop@0.2",
           "jsr:@std/assert@^1.0.19",
           "npm:@remix-run/ui@0.8"

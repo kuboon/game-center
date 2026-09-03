@@ -46,6 +46,11 @@ import { gamePageAction } from "./controllers/game.tsx";
 import { playPageAction } from "./controllers/play.tsx";
 import { homeAction } from "./controllers/home.tsx";
 import { meAction } from "./controllers/me.tsx";
+import {
+  iconAction,
+  manifestAction,
+  serviceWorkerAction,
+} from "./controllers/pwa.ts";
 import { schemaAction } from "./controllers/schema.ts";
 import { dpop } from "./middleware/dpop.ts";
 import { gameCors } from "./middleware/game_cors.ts";
@@ -65,6 +70,9 @@ router.get(routes.author, authorPageAction);
 router.get(routes.me, meAction);
 router.get(routes.dev, devAction);
 router.get(routes.schema, schemaAction);
+router.get(routes.webManifest, manifestAction);
+router.get(routes.appIcon, iconAction);
+router.get(routes.serviceWorker, serviceWorkerAction);
 
 router.post(routes.internalSession, internalSessionAction);
 router.get(routes.internalGames, internalGamesAction);

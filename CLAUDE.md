@@ -272,6 +272,25 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   カタログだけが並ぶ
 - 筐体は SSR とCSS だけで出る。JS を切ってもカタログは読める
 
+## PWA / 通知
+
+`server/controllers/pwa.ts` が manifest・アイコン・service worker を配る。
+`bundled/` ではなくルートなのは、`/schema/gamecenter.json` と同じ理由
+(モジュールグラフに乗るので read 権限が要らず、ビルド漏れで 404 にならない)。
+`sw.js` を `bundled/` に置くと `clearJsOutput` に消される、という事情もある。
+
+- **service worker は何もキャッシュしない**。インストール可能と見なされるために
+  在るだけ。ここの全ページは動く DB のビューなので、キャッシュから返すと
+  サーバがもう変えたカタログを見せ続けることになる。push
+  ハンドラの置き場でもある
+- **iOS の Web Push はホーム画面 PWA の中でしか動かない**。だから「ホーム画面に
+  追加」は「通知して」の前半であって、並列の機能ではない
+- 端末ごとの可否判定と案内は `@kuboon/browser-how-to` に任せる
+  (`client/install_card.tsx`)。UA 判定を自前で書かない。アプリ内ブラウザ
+  (LINE、Messenger 等)は a2hs も push も塞ぐので、そこは `escapeInAppBrowser`
+  で標準ブラウザへ逃がす
+- 案内文は日本語のみ。他言語が要るならヘッドレス API で自前に描く
+
 ## 実績解除
 
 解除は3モードあるが、サーバ側の入口は2つ。ゲームからの REST
