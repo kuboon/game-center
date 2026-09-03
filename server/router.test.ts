@@ -1,4 +1,4 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 
 import router from "./router.ts";
 
@@ -88,6 +88,63 @@ Deno.test("GET /schema/gamecenter.json serves the manifest schema", async () => 
   const schema = await response.json();
   assertEquals(schema.$id, "https://ga-cen.kbn.one/schema/gamecenter.json");
   assertEquals(schema.required, ["id", "author", "title", "achievements"]);
+});
+
+Deno.test("the hub is installable", async () => {
+  // Installing is not only a convenience: on iOS, Web Push works exclusively
+  // inside a home-screen PWA, so a manifest the browser accepts is the first
+  // half of "notify me".
+  const response = await router.fetch(
+    new Request("http://localhost/manifest.webmanifest"),
+  );
+  assertEquals(response.status, 200);
+  assertStringIncludes(
+    response.headers.get("content-type") ?? "",
+    "application/manifest+json",
+  );
+
+  const manifest = await response.json();
+  assertEquals(manifest.start_url, "/");
+  assertEquals(manifest.display, "standalone");
+  // An icon a launcher can actually draw, at whatever size it asks for.
+  assert(manifest.icons.length > 0);
+  assertEquals(manifest.icons[0].src, "/icons/icon.svg");
+});
+
+Deno.test("the manifest's icon is served where it says", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/icons/icon.svg"),
+  );
+  assertEquals(response.status, 200);
+  assertStringIncludes(response.headers.get("content-type") ?? "", "image/svg");
+  assertStringIncludes(await response.text(), "<svg");
+});
+
+Deno.test("the service worker exists and caches nothing", async () => {
+  const response = await router.fetch(new Request("http://localhost/sw.js"));
+  assertEquals(response.status, 200);
+  assertStringIncludes(
+    response.headers.get("content-type") ?? "",
+    "text/javascript",
+  );
+
+  // A worker is what makes a browser treat this as installable, and that is
+  // all this one is for. Every page here is a view of a database that moves,
+  // so a fetch handler serving from a cache would show a player a catalog the
+  // server has already changed.
+  const source = await response.text();
+  assert(!source.includes('addEventListener("fetch"'));
+  assert(!source.includes("caches."));
+});
+
+Deno.test("the shell points at the manifest", async () => {
+  const html = await (await router.fetch(new Request("http://localhost/")))
+    .text();
+  assertStringIncludes(
+    html,
+    '<link rel="manifest" href="/manifest.webmanifest"',
+  );
+  assertStringIncludes(html, '<meta name="theme-color"');
 });
 
 Deno.test("the internal API refuses a request with no DPoP proof", async () => {

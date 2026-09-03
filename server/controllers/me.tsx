@@ -23,6 +23,8 @@ import type { Action } from "@remix-run/fetch-router";
 import { AccountCard } from "../../client/account_card.tsx";
 import { AchievementList } from "../../client/achievement_list.tsx";
 import { Followers } from "../../client/followers.tsx";
+import { InstallCard } from "../../client/install_card.tsx";
+import { NotifyCard } from "../../client/notify_card.tsx";
 import { Timeline } from "../../client/timeline.tsx";
 import { routes } from "../routes.ts";
 import { renderPage } from "../utils/render.tsx";
@@ -50,6 +52,10 @@ export const meAction = {
             <AchievementList />
           </div>
         </div>
+
+        <InstallCard />
+
+        <NotifyCard />
 
         <AccountCard returnTo="/me" />
 

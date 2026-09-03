@@ -20,6 +20,10 @@ export const routes = route({
   me: get("/me"),
   dev: get("/dev"),
   schema: get("/schema/gamecenter.json"),
+  webManifest: get("/manifest.webmanifest"),
+  appIcon: get("/icons/icon.svg"),
+  serviceWorker: get("/sw.js"),
+  jwks: get("/.well-known/jwks.json"),
 
   internalSession: post("/api/internal/session"),
   internalGames: get("/api/internal/games"),

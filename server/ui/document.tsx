@@ -70,6 +70,16 @@ export function Document(handle: Handle<DocumentProps>) {
             content={image ? "summary_large_image" : "summary"}
           />
 
+          {
+            /* Installable: the manifest and the theme colour the launcher and
+              the OS chrome read. `theme_color` is the marquee, because the
+              navbar directly under it is. */
+          }
+          <link rel="manifest" href={routes.webManifest.href()} />
+          <meta name="theme-color" content="#161a35" />
+          <link rel="apple-touch-icon" href={routes.appIcon.href()} />
+          <link rel="icon" href={routes.appIcon.href()} type="image/svg+xml" />
+
           <script async type="module" src="/mod.js"></script>
           {
             /* One face, for the cabinet's own lettering. Japanese body text
