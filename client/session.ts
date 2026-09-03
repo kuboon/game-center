@@ -35,6 +35,15 @@ export type FetchDpop = (
 
 type SessionEventMap = { change: Event };
 
+/**
+ * How long to wait for the IdP before deciding this browser is signed out.
+ *
+ * Generous enough for a slow phone on a bad connection, short enough that a
+ * page whose IdP is down still becomes usable rather than sitting on a
+ * spinner.
+ */
+const IDP_PROBE_TIMEOUT_MS = 8_000;
+
 /** What the IdP's `/session` answers a signed-in browser. */
 interface IdpSession {
   readonly userId?: string | null;
@@ -51,6 +60,14 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
   userId: string | null = null;
   /** Display name the hub knows, once the session has been established. */
   displayName: string | null = null;
+  /**
+   * The public handle, which is what `/@{handle}` is keyed by.
+   *
+   * A column of its own at the hub rather than the IdP id, so it is asked for
+   * rather than derived from {@link userId} — the two start equal and are free
+   * to diverge.
+   */
+  handle: string | null = null;
   /** True once the initial probe has resolved, successfully or not. */
   ready = false;
   /**
@@ -68,8 +85,16 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
    * Generate or reuse the DPoP key, probe the IdP, and — when signed in — hand
    * the hub the identity token so it opens a server-side session.
    *
-   * Always resolves, even when DPoP is unavailable, so subscribers leave the
-   * loading state instead of hanging.
+   * Always resolves, even when DPoP is unavailable or the IdP never answers,
+   * so subscribers leave the loading state instead of hanging.
+   *
+   * That last case is the one that matters. Every signed-in control on this
+   * hub waits on {@link ready}, and so does every *signed-out* one — the
+   * "サインインしてフォロー" button on a profile page is drawn only once the
+   * probe has come back saying nobody is signed in. A probe with no deadline
+   * therefore does not merely delay the answer, it removes the button from the
+   * page a visitor arrived at from somebody's link, which is the single most
+   * important thing on it.
    */
   load(): Promise<void> {
     return (this.#loading ??= (async () => {
@@ -116,6 +141,7 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
     await this.fetchDpop(`${IDP_ORIGIN}/session/logout`, { method: "POST" });
     this.userId = null;
     this.displayName = null;
+    this.handle = null;
     // Somebody else's badge is not this browser's to keep showing.
     this.unseenFollowers = null;
     this.#emitChange();
@@ -131,11 +157,16 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
     if (!this.fetchDpop) return;
     let session: IdpSession;
     try {
-      const response = await this.fetchDpop(`${IDP_ORIGIN}/session`);
+      const response = await this.fetchDpop(`${IDP_ORIGIN}/session`, {
+        signal: AbortSignal.timeout(IDP_PROBE_TIMEOUT_MS),
+      });
       if (!response.ok) return;
       session = await response.json() as IdpSession;
     } catch {
-      // Signed out: the cross-origin probe can 401 or reject outright.
+      // Signed out, or the IdP did not answer in time. Both mean the same
+      // thing to the page: carry on without a session. A visitor who was in
+      // fact signed in gets a sign-in button that signs them straight back in,
+      // which is recoverable; a page that never finishes loading is not.
       return;
     }
     if (!session.userId || !session.jws) return;
@@ -150,9 +181,11 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
     const hub = await response.json() as {
       userId: string;
       displayName: string;
+      handle: string | null;
     };
     this.userId = hub.userId;
     this.displayName = hub.displayName;
+    this.handle = hub.handle;
   }
 
   #emitChange(): void {

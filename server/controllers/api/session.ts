@@ -75,6 +75,10 @@ export const internalSessionAction = {
     return apiJson({
       userId: user.externalId,
       displayName: user.displayName,
+      // The public name, which is what `/@{handle}` is keyed by. Sent here
+      // rather than derived in the browser: it is seeded from the IdP id but
+      // is a column of its own, and the two are free to diverge.
+      handle: user.handle,
     });
   },
 } satisfies Action<typeof routes.internalSession>;

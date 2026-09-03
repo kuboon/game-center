@@ -99,6 +99,12 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   未設定ならミドルウェアごと外れ、サインアウト状態で動く
 - SSR には DPoP 証明を付けられないため、サインイン依存の UI は clientEntry
   にしてブラウザ側で埋める(`NavAuth` / `AccountCard`)
+- **IdP への probe には必ず期限を切る**(`client/session.ts` の
+  `IDP_PROBE_TIMEOUT_MS`)。`sessionStore.ready` を待っているのはサインイン中の
+  UI だけではない。`/@{handle}` の「サインインしてフォロー」も、誰も
+  サインインしていないと分かって初めて描かれる。期限が無いと、IdP が黙った
+  ときに答えが遅れるのではなく、**人がリンクから辿り着いたページからボタンが
+  消える**
 
 ## ゲーム登録
 
