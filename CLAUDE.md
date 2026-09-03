@@ -291,6 +291,25 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   で標準ブラウザへ逃がす
 - 案内文は日本語のみ。他言語が要るならヘッドレス API で自前に描く
 
+通知の配信は id.kbn.one が持つ。ハブは **VAPID 鍵も購読も持たない**。
+
+- **VAPID 鍵は送信者のもの**。公開鍵は `subscribe()` の時点で購読に焼き付き、
+  push サービスは対応する秘密鍵の署名しか受け付けない。だから購読は IdP の
+  公開鍵(`GET {IdP}/push/vapid-key`)で作る
+- **購読はこの origin で作る**。ブラウザが `POST {IdP}/push/subscriptions` に
+  登録し、IdP が `Origin` を記録する。`POST {IdP}/rp/notifications` は clientId
+  のドメインから登録された購読にしか配信しないので、ここで作った購読は
+  このハブだけが起こせる。ホーム画面に追加するのも受け取るのもこのハブ
+- 送信は **常にサーバ起点**。`server/lib/rp_notify.ts` が `private_key_jwt`
+  のクライアントアサーションを付けて叩く。共通鍵も事前登録も 無く、IdP は
+  `{rpOrigin}/.well-known/jwks.json` を読んで検証する
+  (`server/lib/rp_identity.ts`、`server/controllers/jwks.ts`)
+- 署名鍵は起動トークンと同じ `RP_SIGNING_KEY_JWK`。公開するのは公開側だけで、
+  `kid` は RFC 7638 thumbprint を導出する(保存すると鍵と名前がずれる)
+- **通知は best-effort**。フォローは通知の成否と無関係に成立する。鍵が無い、 IdP
+  が落ちている、端末が未登録 — どれも `notify` が飲み込んで false を返す
+- 1購読あたり 60 秒に 1 件で IdP 側が絞る。超過はエラーではなく skip
+
 ## 実績解除
 
 解除は3モードあるが、サーバ側の入口は2つ。ゲームからの REST

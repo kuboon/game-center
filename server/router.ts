@@ -51,6 +51,7 @@ import {
   manifestAction,
   serviceWorkerAction,
 } from "./controllers/pwa.ts";
+import { jwksAction } from "./controllers/jwks.ts";
 import { schemaAction } from "./controllers/schema.ts";
 import { dpop } from "./middleware/dpop.ts";
 import { gameCors } from "./middleware/game_cors.ts";
@@ -73,6 +74,7 @@ router.get(routes.schema, schemaAction);
 router.get(routes.webManifest, manifestAction);
 router.get(routes.appIcon, iconAction);
 router.get(routes.serviceWorker, serviceWorkerAction);
+router.get(routes.jwks, jwksAction);
 
 router.post(routes.internalSession, internalSessionAction);
 router.get(routes.internalGames, internalGamesAction);

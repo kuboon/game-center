@@ -23,6 +23,7 @@ export const routes = route({
   webManifest: get("/manifest.webmanifest"),
   appIcon: get("/icons/icon.svg"),
   serviceWorker: get("/sw.js"),
+  jwks: get("/.well-known/jwks.json"),
 
   internalSession: post("/api/internal/session"),
   internalGames: get("/api/internal/games"),

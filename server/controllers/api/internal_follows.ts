@@ -13,7 +13,7 @@
 
 import type { Action } from "@remix-run/fetch-router";
 
-import { requireDb } from "../../db/client.ts";
+import { type Client, requireDb } from "../../db/client.ts";
 import {
   countFollows,
   follow,
@@ -21,8 +21,10 @@ import {
   SelfFollowError,
   unfollow,
 } from "../../db/follows.ts";
+import { countUnseenFollowers } from "../../db/follows.ts";
 import { findUserByHandle } from "../../db/users.ts";
 import { authenticateSession } from "../../lib/auth.ts";
+import { notify } from "../../lib/rp_notify.ts";
 import type { routes } from "../../routes.ts";
 import { apiError, apiJson } from "../../utils/api.ts";
 
@@ -41,6 +43,11 @@ export const internalFollowAction = {
 
     try {
       const created = await follow(client, auth.user.id, target.id);
+      // Only on the call that created it: the button is idempotent, and a
+      // second press must not be a second notification.
+      if (created) {
+        await announce(client, auth.user.displayName, target);
+      }
       return apiJson(
         {
           following: true,
@@ -106,6 +113,32 @@ export const internalFollowStateAction = {
 type HandleBody =
   | { readonly ok: true; readonly handle: string }
   | { readonly ok: false; readonly response: Response };
+
+/**
+ * Tell someone they have a new follower.
+ *
+ * The badge carries the same number `/me` and the navbar show, so a phone icon
+ * and the page agree. Counted after the follow is written, which is why it is
+ * the count and not an increment.
+ *
+ * Awaited rather than fired and forgotten: `notify` swallows its own failures,
+ * and Deno Deploy can end an isolate the moment a response is returned, which
+ * would cut a dangling promise off mid-flight.
+ */
+async function announce(
+  client: Client,
+  follower: string,
+  target: { id: number; externalId: string },
+): Promise<void> {
+  const unseen = await countUnseenFollowers(client, target.id);
+  await notify([target.externalId], {
+    title: "新しいフォロワー",
+    body: `${follower} さんがあなたをフォローしました`,
+    // Straight to the list the badge is counting.
+    url: "/me",
+    badgeCount: unseen,
+  });
+}
 
 async function readHandle(request: Request): Promise<HandleBody> {
   let body: unknown;
