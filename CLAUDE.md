@@ -51,6 +51,14 @@ deno task db …    # migrate / rollback / status / seed / reset / wipe
   `onMixinType` を reconciler が `===` で比較する)、複製されると照合が黙って
   外れて **イベントリスナが一つも張られない**。hydrate も render も走るので
   ログにも型検査にも出ない。`bundler/js.test.ts` が複製を見張っている
+- **エントリの JS は `no-cache` で配る**(`server/router.ts`)。`/play_button.js`
+  は SSR したマークアップが名指しする名前なので、デプロイのたびにブラウザが
+  すでに持っている URL の中身だけが入れ替わる。指示が無いとブラウザは
+  ヒューリスティックに再利用してよく、そうなると**前のデプロイの部品が今の
+  デプロイの HTML の上で動く**。マーカーはハイドレートし、古い部品はサーバとは
+  違う要素を描き、両方が画面に残る(「準備中…」と「遊ぶ」が並ぶ)。 `chunk-*.js`
+  は名前に内容のハッシュが入っているので逆に immutable でよい。
+  `tests/static_headers.test.ts` が両方を見張っている
 
 ## データベース
 
