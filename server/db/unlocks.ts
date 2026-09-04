@@ -130,6 +130,73 @@ export async function unlockAchievement(
   };
 }
 
+/** One achievement a bulk caller wants recorded. */
+export interface UnlockRequest {
+  readonly key: string;
+  readonly score?: number | null;
+}
+
+/** What became of one entry in a bulk unlock. */
+export type UnlockOutcome =
+  | ({ readonly key: string; readonly ok: true } & UnlockResult)
+  | { readonly key: string; readonly ok: false };
+
+/**
+ * Record several unlocks for one game at once.
+ *
+ * One bad key does not sink the batch. A game replaying a queue it kept while
+ * offline can be carrying an achievement the manifest has since retired, and
+ * refusing the whole list would lose the other nine. Each entry answers for
+ * itself, and `ok: false` means the game has no such live achievement.
+ *
+ * Entries run concurrently because they touch different rows, and the calls go
+ * to Turso over HTTP where the round trip dominates. Duplicate keys are folded
+ * first — the same key twice would otherwise race itself into the unique
+ * constraint — keeping the highest score, which is the one that would survive
+ * anyway.
+ *
+ * @param client Database to write to
+ * @param userId The player
+ * @param gameId The game reporting the unlocks
+ * @param requests What to record, in the caller's order
+ * @param via How they were reported
+ * @returns One outcome per distinct key, in the order first seen
+ */
+export async function unlockMany(
+  client: Client,
+  userId: number,
+  gameId: string,
+  requests: readonly UnlockRequest[],
+  via: NewUnlockVia,
+): Promise<UnlockOutcome[]> {
+  const folded = new Map<string, number | null>();
+  for (const { key, score = null } of requests) {
+    if (!folded.has(key)) {
+      folded.set(key, score);
+      continue;
+    }
+    const kept = folded.get(key) ?? null;
+    if (score !== null && (kept === null || score > kept)) {
+      folded.set(key, score);
+    }
+  }
+
+  return await Promise.all(
+    [...folded].map(async ([key, score]): Promise<UnlockOutcome> => {
+      try {
+        const result = await unlockAchievement(client, userId, gameId, key, {
+          via,
+          score,
+        });
+        return { key, ok: true, ...result };
+      } catch (cause) {
+        if (cause instanceof UnknownAchievementError) return { key, ok: false };
+        throw cause;
+      }
+    }),
+  );
+}
+
 const UNLOCK_COLUMNS = `select games.id as game_id, games.title as game_title,
          achievements.key, achievements.title, achievements.description,
          achievements.points, achievements.hidden,

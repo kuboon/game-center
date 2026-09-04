@@ -63,10 +63,11 @@ import { GameCenter } from "https://esm.sh/jsr/@kuboon/game-center-sdk";
 
 const gc = GameCenter.init({ gameId: "<author>/my-puzzle" });
 
-const result = await gc.unlock("first_clear");
-if (!result.recorded) {
-  document.body.appendChild(gc.claimLink("first_clear"));
-}
+await gc.unlock("first_clear");
+
+// 送れなかったぶんは溜まっている。リンク一本で全部記録できる。
+const link = gc.claimLink();
+if (link) document.body.appendChild(link);
 ```
 
 スコアを付けるなら `gc.unlock("high_score", { score: 1200 })`。
@@ -78,12 +79,13 @@ if (!result.recorded) {
 
 ```ts
 const a = document.createElement("a");
-a.href = `https://ga-cen.kbn.one/claim/@${AUTHOR}/my-puzzle/first_clear`;
-a.target = "_blank";
-a.rel = "noopener";
+a.href = `https://ga-cen.kbn.one/claim/@${AUTHOR}/my-puzzle#gc=first_clear,high_score:1200`;
 a.textContent = "実績を記録する";
 container.replaceChildren(a);
 ```
+
+フラグメントに `key` をカンマ区切りで並べ、スコアは `:` で足す。
+遷移先で一覧を確認してから、まとめて記録される。
 
 **どちらの場合も `window.open` を勝手に呼ばないこと。**
 ポップアップブロックに食われるし、記録される前にプレイヤーが中身を見るべきである。

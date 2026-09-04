@@ -119,22 +119,32 @@ import { GameCenter } from "https://esm.sh/jsr/@kuboon/game-center-sdk";
 
 const gc = GameCenter.init({ gameId: "kuboon/my-puzzle" });
 
-const result = await gc.unlock("first_clear");
-if (!result.recorded) {
-  document.body.appendChild(gc.claimLink("first_clear"));
-}
+await gc.unlock("first_clear");
+await gc.unlock("high_score", { score: 1200 });
+
+// 送れなかったぶんは溜まっている。リンク一つで全部記録できる。
+const link = gc.claimLink();
+if (link) document.body.appendChild(link);
 ```
 
-`unlock()` は2つの経路を順に試し、最初に通ったものを使う。
+ハブへの道は2つある。
 
 | モード | 条件 | 体験 |
 |---|---|---|
 | REST | 起動トークンがある（ハブ経由で起動された） | 即時、ページ遷移なし |
-| claim URL | いつでも | 別タブで確認してから記録 |
+| claim リンク | いつでも | ハブで確認してから記録 |
+
+ハブの「遊ぶ」から来たプレイヤーは起動トークンを持っているので、`unlock()` はその場で記録する。
+持っていない人 — ゲームの URL を直接開いた、オフラインだった、トークンが切れた — は認証する手段が無いので、解除は `localStorage` のキューに入って待つ。
+
+**キューの出口は2つある。**
+あとからトークンが手に入れば、SDK が起動時にキューをまとめて送る。
+そうでなければ、プレイヤーが claim リンクを一度たどってハブで確認する。
+どちらの道でも、プレイヤーが実績ごとに何かをする必要はない。
 
 **例外を投げず、勝手に遷移もしない。**
-`recorded` が false のとき `claimUrl` が入っているので、呼び出し側がそれをリンクとして画面に出す。
-`claimLink()` がその `<a>` を作る。
+`unlock()` は `{ recorded, pending }` を返す。
+`pending` が 0 でなければ `claimLink()` がその件数ぶんの `<a>` を作る（0 件なら `null`）。
 
 **勝手に `window.open` しないこと。**
 ポップアップブロックに食われるし、記録される前にプレイヤーが中身を見るべきである。
@@ -146,18 +156,39 @@ if (!result.recorded) {
 ロードのたびに同じ実績を報告してよい。
 2回目以降は解除日時も経路も動かない。
 
+### claim リンクの形
+
+一覧は URL の**フラグメント**に載る。
+
+```
+https://ga-cen.kbn.one/claim/@kuboon/my-puzzle#gc=first_clear,high_score:1200
+```
+
+`key` をカンマで区切り、スコアは `:` で足す。
+実績キーは英小文字・数字・アンダースコア・ハイフンに限られるので、区切り文字とぶつからない。
+
+フラグメントである理由は3つある。
+素のリンクのままなので、サンドボックスされたページからでも動き、遷移はブラウザのものになる。
+サーバには一度も届かないので、プレイヤーが同意する前にゲームの申告が記録もログもされない。
+そして戻る・リロードで何も起きない（POST ならもう一度送られてしまう）。
+
+ハブ側は確認画面で「新しく記録します」「スコアを更新します」「記録済み」を並べ、ボタンを押すまで何も書かない。
+記録が済むと、実際に書けたキーを `#gcclaimed=first_clear,high_score` としてゲームの URL に付けて戻す。
+SDK はそれを読んでキューから消す。
+
 ### SDK を使わない
 
 リンクを一つ出すだけでも動く。
 
 ```html
-<a href="https://ga-cen.kbn.one/claim/@kuboon/my-puzzle/first_clear" target="_blank">
+<a href="https://ga-cen.kbn.one/claim/@kuboon/my-puzzle#gc=first_clear">
   実績を記録する
 </a>
 ```
 
-スコアは `?score=1200`。
 外部スクリプトを読み込めない環境ではこれが唯一の手段であり、同時に一番確実な手段でもある。
+一つ前の形式（`/claim/@kuboon/my-puzzle/first_clear?score=1200`）も動き続ける。
+ゲームは SDK のコピーを同梱するので、すでに配られたリンクは古い形のままだからである。
 
 ### 起動トークン
 
@@ -185,7 +216,7 @@ CORS は全オリジンに開いている（Cookie を使わずヘッダのト�
 
 | メソッドとパス | 役割 |
 |---|---|
-| `POST /api/game/v1/unlock` | `{ achievement, score? }` |
+| `POST /api/game/v1/unlock` | `{ achievement, score? }`、または一括で `{ unlocks: [{ key, score? }] }` |
 | `GET /api/game/v1/me` | プレイヤーの表示名と、このゲームでの解除済み実績 |
 | `GET /api/game/v1/achievements` | このゲームの実績定義。未解除の隠し実績は題名も説明も null |
 
@@ -198,6 +229,7 @@ CORS は全オリジンに開いている（Cookie を使わずヘッダのト�
 |---|---|
 | `/@{author}` | 作者ページ |
 | `/@{author}/{slug}` | ゲーム詳細 |
-| `/claim/@{author}/{slug}/{key}` | claim URL の受け口 |
+| `/claim/@{author}/{slug}` | claim リンクの受け口。フラグメントの一覧を確認して記録 |
+| `/claim/@{author}/{slug}/{key}` | 一つ前の形式の claim URL |
 | `/schema/gamecenter.json` | マニフェストの JSON Schema |
 | `/llms.txt` | この文書と SDK 全文を1ファイルにしたもの |

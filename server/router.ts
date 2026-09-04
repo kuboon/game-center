@@ -36,10 +36,11 @@ import { internalGamePeersAction } from "./controllers/api/internal_game_peers.t
 import { internalMeAchievementsAction } from "./controllers/api/internal_me.ts";
 import {
   internalClaimAction,
+  internalClaimPreviewAction,
   internalLaunchAction,
 } from "./controllers/api/internal_play.ts";
 import { internalSessionAction } from "./controllers/api/session.ts";
-import { claimPageAction } from "./controllers/claim.tsx";
+import { claimAllPageAction, claimPageAction } from "./controllers/claim.tsx";
 import { devAction } from "./controllers/dev.tsx";
 import { authorPageAction } from "./controllers/author.tsx";
 import { gamePageAction } from "./controllers/game.tsx";
@@ -89,6 +90,7 @@ const router = createRouter({
 
 router.get(routes.home, homeAction);
 router.get(routes.game, gamePageAction);
+router.get(routes.claimAll, claimAllPageAction);
 router.get(routes.claim, claimPageAction);
 router.get(routes.author, authorPageAction);
 router.get(routes.me, meAction);
@@ -106,6 +108,7 @@ router.post(routes.internalApprove, internalApproveAction);
 router.delete(routes.internalDismiss, internalDismissAction);
 router.post(routes.internalLaunch, internalLaunchAction);
 router.post(routes.internalClaim, internalClaimAction);
+router.post(routes.internalClaimPreview, internalClaimPreviewAction);
 router.get(routes.internalMeAchievements, internalMeAchievementsAction);
 router.post(routes.internalFollow, internalFollowAction);
 router.delete(routes.internalUnfollow, internalUnfollowAction);
