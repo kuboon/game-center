@@ -18,7 +18,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface PeerScoresProps {
   /** Author handle and slug, to address the endpoint. */
@@ -76,12 +76,7 @@ export const PeerScores = clientEntry(
       handle.update();
     };
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => void load(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
-    }
+    mountSession(handle, () => load());
 
     return () => {
       // Signed out, or nobody you follow has played this. Either way there is

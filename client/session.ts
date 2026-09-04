@@ -12,15 +12,8 @@
  * still probe the IdP once, and a `change` event keeps them in sync — signing
  * out in one place updates the navbar immediately.
  *
- * Subscribe with a clientEntry's `handle.signal` so the listener is dropped on
- * unmount:
- *
- * ```ts
- * sessionStore.addEventListener("change", () => handle.update(), {
- *   signal: handle.signal,
- * });
- * void sessionStore.load();
- * ```
+ * A clientEntry wires itself up with {@link mountSession}, which is the only
+ * correct way to do it — see the two traps documented there.
  */
 
 import { init } from "@kuboon/dpop";
@@ -260,3 +253,61 @@ const holder = globalThis as unknown as Record<
 
 export const sessionStore: DpopSessionStore =
   (holder[STORE_KEY] ??= new DpopSessionStore());
+
+/** What {@link mountSession} gives a clientEntry to render from. */
+export interface SessionMount {
+  /**
+   * Whether this entry has seen the session answer.
+   *
+   * Not the same as `sessionStore.ready`, and the difference is the point:
+   * `ready` asks whether the *store* has finished, which on a frame navigation
+   * was true long before this entry existed. This asks whether *this entry*
+   * has been told, and it is false for the first render every time.
+   */
+  readonly ready: boolean;
+}
+
+/**
+ * Wire a clientEntry to the shared session.
+ *
+ * Two things go wrong when this is written by hand, and both of them only go
+ * wrong on a frame navigation — which is how most people move around the hub,
+ * and which never happens while developing a single page by reloading it.
+ *
+ * **The change event does not come.** `load()` is idempotent: the second
+ * caller gets the first call's promise and no event. An entry mounted into a
+ * page whose session settled minutes ago will wait forever for a `change` that
+ * has already happened, so whatever it meant to fetch is never fetched. That
+ * is how `/@{handle}` lost its follow button and the game page stopped minting
+ * launch tokens. So `whenSettled` is called once from here as well.
+ *
+ * **The first render must match the server.** The server has no session and
+ * always renders the unknown state; a browser that already knows renders
+ * something else, and the two disagree. Hence {@link SessionMount.ready},
+ * which is false for the first render and true from the second — rather than
+ * `sessionStore.ready`, which is whatever the store happens to know.
+ *
+ * @param handle The clientEntry's handle, for re-rendering and unmount
+ * @param whenSettled Called once on mount and again on every later change
+ * @returns What to render from
+ */
+export function mountSession(
+  handle: { update(): void; signal: AbortSignal },
+  whenSettled?: () => unknown,
+): SessionMount {
+  const mount = { ready: false };
+  if (typeof document === "undefined") return mount;
+
+  sessionStore.addEventListener("change", () => {
+    handle.update();
+    void whenSettled?.();
+  }, { signal: handle.signal });
+
+  void sessionStore.load().then(() => {
+    mount.ready = true;
+    handle.update();
+    whenSettled?.();
+  });
+
+  return mount;
+}

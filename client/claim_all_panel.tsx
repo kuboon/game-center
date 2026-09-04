@@ -31,7 +31,7 @@ import {
   type ClaimItem,
   parseClaimLink,
 } from "./claim_link.ts";
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface ClaimAllPanelProps {
   gameId: string;
@@ -104,12 +104,9 @@ export const ClaimAllPanel = clientEntry(
       asked = parseClaimLink(globalThis.location.hash);
       const stashed = takeClaimIntent(handle.props.gameId);
       if (asked.length === 0 && stashed) asked = parseClaimLink(stashed);
-
-      sessionStore.addEventListener("change", () => void load(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
     }
+
+    const session = mountSession(handle, () => load());
 
     const load = async () => {
       const { fetchDpop, userId } = sessionStore;
@@ -180,7 +177,7 @@ export const ClaimAllPanel = clientEntry(
     const titleOf = (item: PreviewItem) => item.title ?? item.key;
 
     return () => {
-      if (!sessionStore.ready) return <p>確認中…</p>;
+      if (!session.ready) return <p>確認中…</p>;
 
       if (asked.length === 0) {
         return (

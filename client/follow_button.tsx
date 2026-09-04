@@ -32,7 +32,7 @@ import {
 } from "@remix-run/ui";
 
 import { rememberFollowIntent, takeFollowIntent } from "./follow_intent.ts";
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface FollowButtonProps {
   /** The player whose page this is. */
@@ -114,12 +114,7 @@ export const FollowButton = clientEntry(
       }
     };
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => void load(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
-    }
+    const session = mountSession(handle, load);
 
     const signInToFollow = () => {
       rememberFollowIntent(handle.props.handle);
@@ -149,11 +144,11 @@ export const FollowButton = clientEntry(
       const followers = state?.followers ?? handle.props.followers;
       const followees = state?.followees ?? handle.props.followees;
       // Bound rather than tested inline so the null check narrows `state`.
-      const active = sessionStore.ready && sessionStore.userId && state &&
+      const active = session.ready && sessionStore.userId && state &&
           !state.self
         ? state
         : null;
-      const invited = sessionStore.ready && !sessionStore.userId;
+      const invited = session.ready && !sessionStore.userId;
 
       return (
         <div class="space-y-2">

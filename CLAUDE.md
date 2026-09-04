@@ -118,6 +118,19 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   悩まないために、答えが来なかったときだけ裏で訊き直す**(`#retryProbe`)。 401
   は「サインアウト」という答えなので訊き直さない。ページはすぐ使えて、
   遅れて届いたセッションで直る
+- **clientEntry は `mountSession(handle, load)` でセッションに繋ぐ**
+  (`client/session.ts`)。手で書くと二つ壊れ、どちらも**フレーム遷移でしか
+  壊れない** — つまり一枚のページをリロードして開発している間は起きない
+- `load()` は冪等なので、**二度目の呼び出しは change を出さない**。遷移で
+  新しく生えた clientEntry は、すでに起きてしまった change を待ち続ける。
+  `/@{handle}` からフォローボタンが消え、ゲームページが起動トークンを
+  取らなくなったのはこれ
+- **初回描画はサーバと一致させる**。サーバはセッションを持たないので必ず
+  「まだ分からない」を描く。すでに知っているブラウザが違うものを描けば hydration
+  mismatch になり、`遊ぶ` のリンクが一瞬トークン無しで生きる。 だから
+  `sessionStore.ready` ではなく `mountSession` が返す `ready` を見る(初回は必ず
+  false)
+- `tests/session_wiring.test.ts` が三つとも見張っている
 
 ## ゲーム登録
 

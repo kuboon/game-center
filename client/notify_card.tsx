@@ -30,7 +30,7 @@ import { detectPushStatus } from "@kuboon/browser-how-to/push";
 import { showPushGuide } from "@kuboon/browser-how-to/push/ui";
 
 import { IDP_ORIGIN } from "./idp.ts";
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface NotifyCardProps {
   [key: string]: SerializableValue;
@@ -128,16 +128,14 @@ export const NotifyCard = clientEntry(
       }
     };
 
+    const session = mountSession(handle);
+
     if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => handle.update(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
       void refresh();
     }
 
     return () => {
-      if (!sessionStore.ready) return null;
+      if (!session.ready) return null;
       if (!sessionStore.userId) return null;
 
       return (

@@ -15,7 +15,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface ClaimPanelProps {
   gameId: string;
@@ -39,12 +39,7 @@ export const ClaimPanel = clientEntry(
     let error: string | null = null;
     let done: ClaimResponse | null = null;
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => handle.update(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
-    }
+    const session = mountSession(handle);
 
     const returnTo = () =>
       `/claim/@${handle.props.gameId}/${handle.props.achievementKey}` +
@@ -85,7 +80,7 @@ export const ClaimPanel = clientEntry(
     };
 
     return () => {
-      if (!sessionStore.ready) return <p>確認中…</p>;
+      if (!session.ready) return <p>確認中…</p>;
 
       if (!sessionStore.userId) {
         return (

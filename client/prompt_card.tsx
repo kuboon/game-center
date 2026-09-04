@@ -14,7 +14,7 @@
 
 import { clientEntry, type Handle, on } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 /** The instruction, with the player's own handle already in it. */
 function prompt(handle: string): string {
@@ -86,17 +86,12 @@ export const PromptCard = clientEntry(
     let loaded = false;
     let copied = false;
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => {
-        void load();
-      }, { signal: handle.signal });
-      void sessionStore.load().then(load);
-    }
+    const session = mountSession(handle, load);
 
     async function load(): Promise<void> {
       const { fetchDpop, userId } = sessionStore;
       if (!userId || !fetchDpop) {
-        loaded = sessionStore.ready;
+        loaded = session.ready;
         handle.update();
         return;
       }
@@ -129,7 +124,7 @@ export const PromptCard = clientEntry(
     };
 
     return () => {
-      if (!sessionStore.ready || !sessionStore.userId) return null;
+      if (!session.ready || !sessionStore.userId) return null;
       if (!loaded) return <p>読み込み中…</p>;
       if (!myHandle) return null;
 

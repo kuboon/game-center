@@ -18,7 +18,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface TimelineProps {
   [key: string]: SerializableValue;
@@ -66,15 +66,10 @@ export const Timeline = clientEntry(
       handle.update();
     };
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => void load(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
-    }
+    const session = mountSession(handle, () => load());
 
     return () => {
-      if (!sessionStore.ready) return <p class="opacity-70">確認中…</p>;
+      if (!session.ready) return <p class="opacity-70">確認中…</p>;
       if (!sessionStore.userId) {
         return (
           <p class="opacity-70">
