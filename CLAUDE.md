@@ -263,6 +263,10 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   二重に出るだけ
 - **キューがあるので claim 画面は「サインアウトで遊んだ人の逃げ道」に縮む**。
   あとからハブ経由で起動すれば、SDK が黙ってキューをまとめて送る
+- `achievements()` は**ハブから題名を取る**。未取得の hidden は `title` が null
+  で返る。何を伏せるかを知っているのはハブだけで、ゲームの手元のマニフェストには
+  本文が書いてある。キューのぶんは `unlocked: true` + `pending: true` で畳み込む
+  — 「取った」と「記録された」の差はプレイヤーに見せるもの
 - 起動トークンはフラグメントから読んで localStorage に入れ、アドレスバーから
   消す。401 が返ったら捨てる(以後成功しえないリクエストを待たないため)
 - **JSR に公開する**(`@kuboon/game-center-sdk`)。`packages/sdk` の中で

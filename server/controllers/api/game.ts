@@ -117,21 +117,27 @@ export const gameAchievementsAction = {
       listAchievements(client, gameId),
       listUnlocksForGame(client, auth.user.id, gameId),
     ]);
-    const unlockedKeys = new Set(unlocked.map((unlock) => unlock.key));
+    const byKey = new Map(unlocked.map((unlock) => [unlock.key, unlock]));
 
     return apiJson({
       achievements: defined.map((achievement) => {
         // A hidden achievement keeps its wording secret until it is earned,
         // and the hub is the one place that can enforce that: the game's own
         // copy of the manifest has the text in it.
-        const secret = achievement.hidden && !unlockedKeys.has(achievement.key);
+        const have = byKey.get(achievement.key);
+        const secret = achievement.hidden && have === undefined;
         return {
           key: achievement.key,
           title: secret ? null : achievement.title,
           description: secret ? null : achievement.description,
           points: achievement.points,
           hidden: achievement.hidden,
-          unlocked: unlockedKeys.has(achievement.key),
+          unlocked: have !== undefined,
+          // Carried here as well as on `/me` so a game showing its own
+          // achievement screen needs one request rather than two that have to
+          // be lined up afterwards.
+          unlockedAt: have?.unlockedAt ?? null,
+          score: have?.score ?? null,
         };
       }),
     });
