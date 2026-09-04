@@ -57,11 +57,36 @@ import { dpop } from "./middleware/dpop.ts";
 import { gameCors } from "./middleware/game_cors.ts";
 import { routes } from "./routes.ts";
 
-const serveBundled = staticFiles(
-  new URL("../bundled", import.meta.url).pathname,
-);
+/**
+ * `bundled/` is served twice, because its two halves want opposite things.
+ *
+ * `chunk-*.js` carries a content hash in its name, so what it holds can never
+ * change — cache it forever. The entry points cannot: `/play_button.js` is the
+ * name the server-rendered markup asks for, so every deploy replaces the file
+ * behind a URL the browser already has. With no directive the browser is free
+ * to reuse its copy for a heuristic freshness window, and then the page runs
+ * the *last* deploy's component against *this* deploy's HTML. That is not a
+ * stale pixel: the marker hydrates, the old component renders a different
+ * element than the server did, and both stay on screen at once.
+ *
+ * `no-cache` keeps the copy and revalidates it, which the ETag answers with a
+ * 304 — the same cost as a cache hit, minus the wrong answer.
+ */
+const BUNDLED = new URL("../bundled", import.meta.url).pathname;
+const isHashed = (path: string) => path.startsWith("chunk-");
 
-const router = createRouter({ middleware: [serveBundled, gameCors, dpop] });
+const serveHashed = staticFiles(BUNDLED, {
+  filter: isHashed,
+  cacheControl: "public, max-age=31536000, immutable",
+});
+const serveBundled = staticFiles(BUNDLED, {
+  filter: (path) => !isHashed(path),
+  cacheControl: "no-cache",
+});
+
+const router = createRouter({
+  middleware: [serveHashed, serveBundled, gameCors, dpop],
+});
 
 router.get(routes.home, homeAction);
 router.get(routes.game, gamePageAction);
