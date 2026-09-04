@@ -17,7 +17,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface CatalogSectionsProps {
   [key: string]: SerializableValue;
@@ -61,12 +61,7 @@ export const CatalogSections = clientEntry(
       handle.update();
     };
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => void load(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
-    }
+    mountSession(handle, () => load());
 
     return () => {
       if (!catalog) return null;

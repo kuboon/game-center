@@ -24,7 +24,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface DevConsoleProps {
   /** Where the IdP should send the browser back to after authenticating. */
@@ -100,12 +100,7 @@ export const DevConsole = clientEntry(
     let gameUrl = "";
     let manifestText = "";
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => {
-        void refresh();
-      }, { signal: handle.signal });
-      void sessionStore.load().then(refresh);
-    }
+    const session = mountSession(handle, refresh);
 
     function api(path: string, init?: RequestInit): Promise<Response> {
       const fetchDpop = sessionStore.fetchDpop;
@@ -124,7 +119,7 @@ export const DevConsole = clientEntry(
 
     async function refresh(): Promise<void> {
       if (!sessionStore.userId) {
-        loaded = sessionStore.ready;
+        loaded = session.ready;
         handle.update();
         return;
       }
@@ -256,7 +251,7 @@ export const DevConsole = clientEntry(
     };
 
     return () => {
-      if (!sessionStore.ready || (sessionStore.userId && !loaded)) {
+      if (!session.ready || (sessionStore.userId && !loaded)) {
         return <p>読み込み中…</p>;
       }
       if (!sessionStore.userId) {

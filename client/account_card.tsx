@@ -17,7 +17,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface AccountCardProps {
   /** Where the IdP should send the browser back to after authenticating. */
@@ -31,12 +31,7 @@ export const AccountCard = clientEntry(
     let signOutBusy = false;
     let error: string | null = null;
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => handle.update(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
-    }
+    const session = mountSession(handle);
 
     const onSignInClick = () => sessionStore.signIn(handle.props.returnTo);
 
@@ -58,7 +53,7 @@ export const AccountCard = clientEntry(
       <div class="card card-border bg-base-100">
         <div class="card-body">
           <h2 class="card-title">アカウント</h2>
-          {!sessionStore.ready ? <p>確認中…</p> : sessionStore.userId
+          {!session.ready ? <p>確認中…</p> : sessionStore.userId
             ? (
               <>
                 <p>

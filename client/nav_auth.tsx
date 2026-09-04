@@ -25,7 +25,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface NavAuthProps {
   /** Where the IdP should send the browser back to after authenticating. */
@@ -62,16 +62,10 @@ export const NavAuth = clientEntry(
       sessionStore.setUnseenFollowers(unseen);
     };
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => {
-        handle.update();
-        void askUnseen();
-      }, { signal: handle.signal });
-      void sessionStore.load();
-    }
+    const session = mountSession(handle, askUnseen);
 
     return () => {
-      if (!sessionStore.ready) {
+      if (!session.ready) {
         return (
           <span class="loading loading-spinner loading-sm text-arcade-dim">
           </span>

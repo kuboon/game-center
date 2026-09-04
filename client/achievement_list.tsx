@@ -7,7 +7,7 @@
 
 import { clientEntry, type Handle, on } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 interface Unlock {
   gameId: string;
@@ -28,17 +28,12 @@ export const AchievementList = clientEntry(
     let loaded = false;
     let error: string | null = null;
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => {
-        void load();
-      }, { signal: handle.signal });
-      void sessionStore.load().then(load);
-    }
+    const session = mountSession(handle, load);
 
     async function load(): Promise<void> {
       const { fetchDpop, userId } = sessionStore;
       if (!userId || !fetchDpop) {
-        loaded = sessionStore.ready;
+        loaded = session.ready;
         handle.update();
         return;
       }
@@ -66,7 +61,7 @@ export const AchievementList = clientEntry(
     const onSignInClick = () => sessionStore.signIn("/me");
 
     return () => {
-      if (!sessionStore.ready || (sessionStore.userId && !loaded)) {
+      if (!session.ready || (sessionStore.userId && !loaded)) {
         return <p>読み込み中…</p>;
       }
       if (!sessionStore.userId) {

@@ -32,7 +32,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { sessionStore } from "./session.ts";
+import { mountSession, sessionStore } from "./session.ts";
 
 export interface PlayButtonProps {
   gameId: string;
@@ -50,6 +50,17 @@ export const PlayButton = clientEntry(
     let error: string | null = null;
     /** Whose session the token was minted for, so a re-render does not re-ask. */
     let mintedFor: string | null = null;
+    /**
+     * False until the session has answered and the first mint has run.
+     *
+     * The server always renders this state, and so must the browser's first
+     * paint — otherwise a frame navigation, which mounts this into a page
+     * whose session settled long ago, renders 遊ぶ against a server that wrote
+     * 準備中…. That is not only a hydration warning: the link would be live
+     * for a moment with no token on it, and a play started in that moment is
+     * recorded nowhere.
+     */
+    let settled = false;
 
     /** Mint once per signed-in identity, and drop the token on sign-out. */
     const mint = async () => {
@@ -89,21 +100,22 @@ export const PlayButton = clientEntry(
       }
     };
 
-    if (typeof document !== "undefined") {
-      sessionStore.addEventListener("change", () => void mint(), {
-        signal: handle.signal,
-      });
-      void sessionStore.load();
-    }
+    // Settling waits for the token as well as the session, so this button
+    // keeps its own flag rather than rendering from `session.ready`.
+    mountSession(handle, async () => {
+      await mint();
+      settled = true;
+      handle.update();
+    });
 
     return () => {
-      // Signed out only once the session has actually answered. Before that it
-      // is unknown, and the label must not flip from one to the other under a
+      // Signed out only once this button has settled. Before that it is
+      // unknown, and the label must not flip from one to the other under a
       // finger already on its way down.
-      const signedOut = sessionStore.ready && !sessionStore.userId;
+      const signedOut = settled && !sessionStore.userId;
       // No href until the answer is in. A link that works too early is a game
       // played without a token, and nothing to show for it afterwards.
-      const pending = !sessionStore.ready || minting;
+      const pending = !settled || minting;
 
       if (signedOut) {
         return (
