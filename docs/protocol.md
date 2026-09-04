@@ -125,11 +125,10 @@ if (!result.recorded) {
 }
 ```
 
-`unlock()` は3つの経路を順に試し、最初に通ったものを使う。
+`unlock()` は2つの経路を順に試し、最初に通ったものを使う。
 
 | モード | 条件 | 体験 |
 |---|---|---|
-| postMessage | ハブの `/play/...` に埋め込まれている | 即時、ページ遷移なし |
 | REST | 起動トークンがある（ハブ経由で起動された） | 即時、ページ遷移なし |
 | claim URL | いつでも | 別タブで確認してから記録 |
 
@@ -162,7 +161,7 @@ if (!result.recorded) {
 
 ### 起動トークン
 
-プレイヤーがハブのカタログからゲームを起動すると、ハブが短命の JWT を発行し、**URL のフラグメント**で渡す。
+プレイヤーがハブのカタログからゲームを起動すると、ハブが有効期限 7 日の JWT を発行し、**URL のフラグメント**で渡す。
 
 ```
 https://example.github.io/my-puzzle/#gctoken=<JWT>
@@ -199,7 +198,6 @@ CORS は全オリジンに開いている（Cookie を使わずヘッダのト�
 |---|---|
 | `/@{author}` | 作者ページ |
 | `/@{author}/{slug}` | ゲーム詳細 |
-| `/play/@{author}/{slug}` | iframe 埋め込みプレイ（postMessage モードの親） |
 | `/claim/@{author}/{slug}/{key}` | claim URL の受け口 |
 | `/schema/gamecenter.json` | マニフェストの JSON Schema |
 | `/llms.txt` | この文書と SDK 全文を1ファイルにしたもの |

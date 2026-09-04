@@ -4,8 +4,8 @@
 /**
  * The SDK's fallback chain, with the browser stubbed.
  *
- * What matters is the order and the floor: the parent frame first, the REST API
- * second, and a claim URL when neither worked — never an error, never a popup.
+ * What matters is the order and the floor: the REST API first, and a claim URL
+ * when it could not be used — never an error, never a popup.
  */
 
 import { assert, assertEquals } from "@std/assert";
@@ -15,24 +15,17 @@ import { GameCenter } from "./mod.ts";
 const HUB = "https://hub.example";
 const GAME = "kuboon/my-puzzle";
 
-/**
- * Install just enough browser for the SDK, and undo it afterwards.
- *
- * Messages go through the real event target rather than a fake one, so the
- * listener bookkeeping under test is the listener bookkeeping that runs.
- */
+/** Install just enough browser for the SDK, and undo it afterwards. */
 function browser(
-  { hash = "", parent = false, fetch: fetchImpl }: {
+  { hash = "", fetch: fetchImpl }: {
     hash?: string;
-    parent?: boolean;
     fetch?: typeof globalThis.fetch;
   } = {},
 ) {
   const store = new Map<string, string>();
-  const posted: Record<string, unknown>[] = [];
   const self = globalThis as unknown as Record<string, unknown>;
   const saved: Record<string, unknown> = {};
-  const keys = ["location", "history", "localStorage", "parent", "fetch"];
+  const keys = ["location", "history", "localStorage", "fetch"];
   for (const key of keys) saved[key] = self[key];
 
   self.location = { hash, pathname: "/game/", search: "" };
@@ -42,24 +35,9 @@ function browser(
     setItem: (k: string, v: string) => store.set(k, v),
     removeItem: (k: string) => store.delete(k),
   };
-  // A page with nothing embedding it has `parent === window`, which is what
-  // the SDK checks. Getting this wrong would make every test look embedded.
-  self.parent = parent
-    ? { postMessage: (m: Record<string, unknown>) => posted.push(m) }
-    : globalThis;
   if (fetchImpl) self.fetch = fetchImpl;
 
   return {
-    posted,
-    /** Answer the message the SDK just posted, as the hub's play page would. */
-    reply(ok: boolean) {
-      const sent = posted.at(-1) as { id: string };
-      globalThis.dispatchEvent(
-        new MessageEvent("message", {
-          data: { type: "gc:unlocked", id: sent.id, ok },
-        }),
-      );
-    },
     restore() {
       for (const key of keys) {
         if (saved[key] === undefined) delete self[key];
@@ -122,48 +100,6 @@ Deno.test("uses the launch token the hub left in the fragment", async () => {
     const unlock = calls.find((c) => c.url.endsWith("/unlock"));
     assertEquals(unlock?.auth, "Bearer LAUNCH");
     assertEquals(unlock?.body, { achievement: "first_clear", score: 10 });
-  } finally {
-    env.restore();
-  }
-});
-
-Deno.test("asks the embedding page before trying anything else", async () => {
-  const env = browser({
-    hash: "#gctoken=LAUNCH",
-    parent: true,
-    fetch: () => {
-      throw new Error("the parent answered; REST should not have been tried");
-    },
-  });
-  try {
-    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
-    const unlocking = gc.unlock("first_clear");
-    await new Promise((r) => setTimeout(r, 0));
-    env.reply(true);
-
-    const result = await unlocking;
-    assertEquals(result.mode, "postmessage");
-    assertEquals(result.recorded, true);
-    assertEquals(
-      (env.posted[0] as { achievement: string }).achievement,
-      "first_clear",
-    );
-  } finally {
-    env.restore();
-  }
-});
-
-Deno.test("moves on when the embedding page says no", async () => {
-  const env = browser({ hash: "#gctoken=LAUNCH", parent: true, fetch: ok });
-  try {
-    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
-    const unlocking = gc.unlock("first_clear");
-    await new Promise((r) => setTimeout(r, 0));
-    env.reply(false);
-
-    // A parent that refuses is not a parent that is absent, but either way the
-    // next way down is worth trying.
-    assertEquals((await unlocking).mode, "rest");
   } finally {
     env.restore();
   }

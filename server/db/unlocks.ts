@@ -12,8 +12,19 @@
 
 import type { Client } from "./client.ts";
 
-/** How an unlock reached the hub. Mirrors the `via` check constraint. */
+/**
+ * How an unlock reached the hub. Mirrors the `via` check constraint.
+ *
+ * `postmessage` is history. The hub used to embed games in an iframe and
+ * record what a game asked its embedder to record; that mode is gone, but the
+ * rows it wrote are players' records and stay readable. The value also stays
+ * in the check constraint, because dropping one means recreating a table that
+ * has rows in it, which a migration cannot do here (see db/README.md).
+ */
 export type UnlockVia = "claim" | "rest" | "postmessage";
+
+/** How an unlock can be recorded now. The hub no longer writes `postmessage`. */
+export type NewUnlockVia = Exclude<UnlockVia, "postmessage">;
 
 /** Raised when the game or achievement named does not exist, or is retired. */
 export class UnknownAchievementError extends Error {
@@ -65,7 +76,7 @@ export async function unlockAchievement(
   userId: number,
   gameId: string,
   key: string,
-  { via, score = null }: { via: UnlockVia; score?: number | null },
+  { via, score = null }: { via: NewUnlockVia; score?: number | null },
 ): Promise<UnlockResult> {
   const found = await client.execute({
     sql:

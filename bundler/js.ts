@@ -30,7 +30,6 @@ const CLIENT_ENTRIES = [
   "claim_panel.tsx",
   "achievement_list.tsx",
   "prompt_card.tsx",
-  "play_frame.tsx",
   "follow_button.tsx",
   "catalog_sections.tsx",
   "peer_scores.tsx",

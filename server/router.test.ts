@@ -292,16 +292,6 @@ Deno.test("the internal API keeps CORS off, even next to the game API", async ()
   assertEquals(response.headers.get("access-control-allow-origin"), null);
 });
 
-Deno.test("GET /play/... says so when the game is unknown", async () => {
-  const response = await router.fetch(
-    new Request("http://localhost/play/@kuboon/nope", {
-      headers: { "rmx-frame": "1" },
-    }),
-  );
-  assertEquals(response.status, 200);
-  assertStringIncludes(await response.text(), "ゲームが見つかりません");
-});
-
 Deno.test("following anyone needs a session", async () => {
   // All three, including the read: whether *you* follow someone is not a fact
   // about them, so there is nobody to answer for without a proof.

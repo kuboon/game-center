@@ -13,11 +13,10 @@
  * gc.player; // { name } | null — only when launched from the hub
  * ```
  *
- * `unlock()` tries three ways of reaching the hub and takes the first that
- * works: posting to the parent frame, calling the REST API with the launch
- * token the hub put in the URL, and finally handing back a claim URL. The last
- * one always works, including from an Artifact, which is why it is the floor
- * rather than an error.
+ * `unlock()` tries two ways of reaching the hub and takes the first that
+ * works: calling the REST API with the launch token the hub put in the URL,
+ * and otherwise handing back a claim URL. The second always works, including
+ * from an Artifact, which is why it is the floor rather than an error.
  *
  * A claim URL is **not** opened for you. Popup blockers eat unprompted
  * `window.open`, and a player should see what they are about to record before
@@ -44,8 +43,8 @@ export interface UnlockOptions {
 }
 
 export interface UnlockResult {
-  /** Which of the three ways reached the hub. */
-  readonly mode: "postmessage" | "rest" | "claim";
+  /** Which of the two ways reached the hub. */
+  readonly mode: "rest" | "claim";
   /** True when the hub has recorded it. False means `claimUrl` is the next step. */
   readonly recorded: boolean;
   /** Present when the player has to confirm this themselves. */
@@ -54,8 +53,6 @@ export interface UnlockResult {
 
 const DEFAULT_HUB = "https://ga-cen.kbn.one";
 const TOKEN_KEY = "gc:token";
-/** How long to wait for the embedding page before giving up on it. */
-const PARENT_TIMEOUT_MS = 2000;
 
 export class GameCenter {
   readonly gameId: string;
@@ -91,12 +88,6 @@ export class GameCenter {
     options: UnlockOptions = {},
   ): Promise<UnlockResult> {
     const claimUrl = this.claimUrl(key, options);
-
-    if (isEmbedded()) {
-      if (await this.#askParent(key, options)) {
-        return { mode: "postmessage", recorded: true };
-      }
-    }
 
     if (this.#token) {
       try {
@@ -144,30 +135,6 @@ export class GameCenter {
     return a;
   }
 
-  /** Ask the embedding page to record it, and wait briefly for an answer. */
-  #askParent(key: string, options: UnlockOptions): Promise<boolean> {
-    const id = `gc-${++this.#pending}`;
-    return new Promise((resolve) => {
-      const done = (ok: boolean) => {
-        globalThis.removeEventListener("message", onMessage);
-        clearTimeout(timer);
-        resolve(ok);
-      };
-      const onMessage = (event: MessageEvent) => {
-        const data = event.data;
-        if (data?.type === "gc:unlocked" && data.id === id) {
-          done(Boolean(data.ok));
-        }
-      };
-      globalThis.addEventListener("message", onMessage);
-      const timer = setTimeout(() => done(false), PARENT_TIMEOUT_MS);
-      globalThis.parent.postMessage(
-        { type: "gc:unlock", id, achievement: key, ...options },
-        "*",
-      );
-    });
-  }
-
   async #loadPlayer(): Promise<void> {
     if (!this.#token) return;
     try {
@@ -186,18 +153,6 @@ export class GameCenter {
     try {
       localStorage.removeItem(TOKEN_KEY);
     } catch { /* storage may be unavailable */ }
-  }
-}
-
-/** Whether something is embedding this page and might answer a postMessage. */
-function isEmbedded(): boolean {
-  try {
-    // Compared as unknowns because a browser's `parent` is a `Window` while
-    // `globalThis` is not typed as one; at runtime, in a page, they are.
-    return (globalThis.parent as unknown) !== (globalThis as unknown);
-  } catch {
-    // Cross-origin access to `parent` can throw. If it does, there is a parent.
-    return true;
   }
 }
 

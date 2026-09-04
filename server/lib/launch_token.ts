@@ -7,8 +7,8 @@
  * write anything: the `aud` claim pins it to one game, so a token leaked from
  * one game cannot touch another's achievements.
  *
- * Short-lived (two hours) and carrying nothing but `sub`, `aud` and `exp`,
- * because it travels through a URL a player can read and paste.
+ * It carries nothing but `sub`, `aud` and `exp`, because it travels through a
+ * URL a player can read and paste.
  */
 
 import {
@@ -21,8 +21,22 @@ import {
 
 import { getConfig } from "../config.ts";
 
-/** How long a launch token stays usable. Long enough for one sitting. */
-export const LAUNCH_TOKEN_TTL_SECONDS = 2 * 60 * 60;
+/**
+ * How long a launch token stays usable.
+ *
+ * A week rather than a sitting, because the token is the only path that
+ * records an unlock without the player doing anything. It lives in the game's
+ * `localStorage`, so a player who bookmarks the game and comes back tomorrow
+ * still has one; expire it in hours and that visit silently stops recording
+ * and falls back to a claim the player has to confirm by hand.
+ *
+ * The length costs little. `aud` pins the token to one game and `sub` to one
+ * player, so all it can ever do is unlock that player's achievements in that
+ * game — which the player can do themselves at the claim page anyway. It is
+ * not a session: it cannot read anything about the player beyond their name,
+ * and it cannot touch another game.
+ */
+export const LAUNCH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 const ALGORITHM = "ES256";
 
