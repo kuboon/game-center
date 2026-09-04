@@ -15,7 +15,6 @@ export const routes = route({
   home: get("/"),
   author: get("/@:handle"),
   game: get("/@:handle/:slug"),
-  play: get("/play/@:handle/:slug"),
   claim: get("/claim/@:handle/:slug/:key"),
   me: get("/me"),
   dev: get("/dev"),

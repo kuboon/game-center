@@ -318,9 +318,10 @@ function optionalInteger(
 }
 
 /**
- * Games are loaded into a page over HTTPS, and the URL doubles as the origin
- * the hub checks in postMessage mode — so anything else is rejected outright.
- * `http://localhost` is allowed so a game can be developed before it ships.
+ * Games are loaded over HTTPS, so anything else is rejected outright: the hub
+ * sends a player here carrying a launch token, and plain http would put it on
+ * the wire. `http://localhost` is allowed so a game can be developed before it
+ * ships.
  */
 function requireHttpsUrl(
   value: string,

@@ -63,7 +63,6 @@ export const internalClaimAction = {
       gameId?: unknown;
       key?: unknown;
       score?: unknown;
-      via?: unknown;
     };
     try {
       body = await context.request.json();
@@ -85,19 +84,13 @@ export const internalClaimAction = {
       score = body.score;
     }
 
-    // Both paths are this hub's own frontend acting for a signed-in player, so
-    // the only difference is which one to record. The play page checks the
-    // frame's origin before it gets here; the claim page has the player's own
-    // click.
-    const via = body.via === "postmessage" ? "postmessage" : "claim";
-
     try {
       const result = await unlockAchievement(
         requireDb(),
         auth.user.id,
         body.gameId,
         body.key,
-        { via, score },
+        { via: "claim", score },
       );
       return apiJson(result, { status: result.created ? 201 : 200 });
     } catch (error) {

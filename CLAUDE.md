@@ -249,9 +249,9 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 は依存ゼロの単一ファイル。**コピペできる大きさに保つこと自体が仕様** (Artifacts
 は外部スクリプトを読めない)。
 
-- `unlock()` は postMessage → REST → claim URL の順に落ちる。**例外を投げず、
-  勝手に遷移しない**。`recorded` が false なら `claimUrl` を返すので、
-  呼び出し側が `claimLink()` でリンクを出す
+- `unlock()` は REST → claim URL の順に落ちる。**例外を投げず、勝手に遷移
+  しない**。`recorded` が false なら `claimUrl` を返すので、呼び出し側が
+  `claimLink()` でリンクを出す
 - 起動トークンはフラグメントから読んで localStorage に入れ、アドレスバーから
   消す。401 が返ったら捨てる(以後成功しえないリクエストを待たないため)
 - **JSR に公開する**(`@kuboon/game-center-sdk`)。`packages/sdk` の中で
@@ -262,9 +262,10 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   CI で `deno publish --dry-run` を回して、公開時ではなくそこで気づく
 - `lib` はブラウザのものだけ。ゲームに同梱されるファイルに Deno の API が
   紛れないようにする。`deno.ns` を参照するのはテストだけ
-- `/play/@{author}/{slug}` が postMessage の親。**`event.origin` が登録済み
-  ゲームの origin と一致することを確かめてから他の何もしない**。その origin は
-  メッセージではなく SSR された登録内容から来る
+- **iframe に埋め込むモードは作ったうえで廃止した**。ハブの枠のぶんゲーム画面が
+  狭くなるのが第一の理由で、SDK から経路が一つ丸ごと消えるのが第二。Artifacts は
+  `frame-ancestors 'self'` を返すのでそもそも埋め込めなかった。**足し直す提案は
+  この判断に反する**(docs/grand_design.md「iframe をやめた理由」)
 
 ## 偽装は防がない
 
@@ -331,13 +332,16 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 
 ## 実績解除
 
-解除は3モードあるが、サーバ側の入口は2つ。ゲームからの REST
-(`POST /api/game/v1/unlock`、起動トークン)と、ハブ自身からの claim
-(`POST /api/internal/claim`、DPoP)。postMessage モードは M5 で `/play/{id}`
-の親ページが claim と同じ処理を呼ぶ。
+解除の入口は2つ。ゲームからの REST
+(`POST /api/game/v1/unlock`、起動トークン)と、 ハブ自身からの claim
+(`POST /api/internal/claim`、DPoP)。
 
 - 解除は冪等。2回目以降は `unlocked_at` も `via` も動かず、`score`
   が保存済みより高いときだけ更新する(`server/db/unlocks.ts`)
+- `via` の check 制約に残る `'postmessage'`
+  は**書かないが消さない**。その値の行が
+  実際にあり、制約から値を落とすにはテーブルを作り直すことになる。書き込みの型
+  (`NewUnlockVia`)だけが狭い
 - `retired = 1` の実績は解除できない(`UnknownAchievementError` → 404)。
   ただし解除済みの記録は `/me` に残り続ける
 - 起動トークンは `RP_SIGNING_KEY_JWK` で署名する短命 JWT。`sub` がローカル user

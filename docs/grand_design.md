@@ -103,7 +103,7 @@ Artifact 上のページは外部ホストへの fetch/XHR が遮断されるた
   │  (登録 API を呼ぶ)                   │ Deno + Remix v3
   ▼                                      │ Turso (libsql)
 GitHub Pages / Claude Artifacts ◀───────┘
-  (SDK 経由で実績解除: claim URL / REST / postMessage)
+  (SDK 経由で実績解除: REST / claim URL)
 ```
 
 登場人物は3者である。
@@ -135,7 +135,6 @@ SDK は利用可能なモードを自動選択する。
 
 | モード | 通信手段 | 動く環境 | 体験 |
 |---|---|---|---|
-| postMessage | iframe 親子間の postMessage | game-center 内に埋め込まれたゲーム | ページ遷移なしで即時反映 |
 | REST | fetch + Bearer トークン | 外部 fetch が可能なホスティング(GitHub Pages 等) | ページ遷移なしで即時反映 |
 | claim URL | リンク遷移(新規タブ) | すべて(Claude Artifacts を含む) | game-center のタブが開き、確認後に解除 |
 
@@ -153,10 +152,8 @@ https://ga-cen.kbn.one/claim/@{author}/{slug}/{achievement_key}
 **REST モード** は、後述の起動トークンを Bearer に付けて `POST /api/game/v1/unlock` を呼ぶ。
 ゲーム用 API は CORS をすべてのオリジンに開放する(トークン認証であり、Cookie を使わないため開放してよい)。
 
-**postMessage モード** は、game-center のプレイページ(`/play/{game_id}`)がゲームを iframe で埋め込んだ場合に使う。
-SDK は `window.parent !== window` を検出し、`{ type: "gc:unlock", achievement: key, score? }` を親に postMessage する。
-親側は iframe の origin が登録済みゲームの URL と一致することを検証してから解除を記録する。
-Claude Artifacts は claude.ai 側の制約で iframe 埋め込みできない見込みのため、このモードは GitHub Pages 等のゲーム向けである。
+**iframe に埋め込む postMessage モードは作ったうえで廃止した。**
+経緯は「iframe をやめた理由」にある。
 
 どのモードでも、解除には任意で **score**(整数)を添えられる。
 解除は冪等であり、解除済みの実績への再報告は、score が保存済みの値より高い場合だけ更新する(ハイスコアのみ保持。`unlocked_at` は初回のまま)。
@@ -529,7 +526,6 @@ Web UI 側の主なルートは次のとおり。
 |---|---|
 | `/` | カタログ(ゲーム一覧) |
 | `/@{handle}/{slug}` | ゲーム詳細。実績一覧と「遊ぶ」ボタン(未サインインなら「サインインしてプレイ」) |
-| `/play/{handle}/{slug}` | iframe 埋め込みプレイページ(postMessage モードの親) |
 | `/claim/@{handle}/{slug}/{key}` | claim URL の受け口。確認して解除 |
 | `/me` | フォロー中の人の実績解除とゲーム登録のタイムライン。自分の実績一覧 |
 | `/@{handle}` | 作者でありプレイヤーのページ。点数・実績・ゲーム数、登録したゲーム、解除した実績 |
@@ -553,7 +549,7 @@ gc.unlock("high_score", { score: 1200 });  // スコア付き。ハイスコア�
 gc.player;                  // { name } | null (起動トークンがある場合のみ)
 ```
 
-`unlock()` の内部は、postMessage → REST → claim URL の順に利用可能なモードへフォールバックする。
+`unlock()` の内部は、REST → claim URL の順に利用可能なモードへフォールバックする。
 **例外を投げず、勝手に遷移もしない。**
 戻り値の `recorded` が false のとき `claimUrl` が入っているので、呼び出し側はそれをリンクとして画面に出す。
 `claimLink()` がその `<a>` を作る。
@@ -568,18 +564,27 @@ URL ごとチャットに貼られてもトークンが一緒に流れないよ�
 パッケージは `lib` をブラウザのものだけに絞ってある。
 ゲームの中に同梱されるファイルに Deno の API が紛れ込まないようにするためで、テストファイルだけが `deno.ns` を参照する。
 
-### /play/@{author}/{slug}
+### iframe をやめた理由
 
-postMessage モードの親側。
-ゲームを iframe で埋め込み、`gc:unlock` を受けてプレイヤー自身のセッションで記録する。
-ゲームは資格情報を一切持たない。
+`/play/@{author}/{slug}` はゲームを iframe で埋め込み、`gc:unlock` を親のセッションで記録するページだった。
+一度作ってから廃止した。
 
-**安全性はひとつの検査に懸かっている。**
-`message` イベントは任意のフレームから届くので、`event.origin` が登録済みゲームの URL の origin と一致することを確かめてから他の何もしない。
-その origin はメッセージからではなく、サーバがレンダリングした登録内容から来る。
+**理由はまず体験である。**
+ハブの枠が付くぶんゲーム画面が狭くなる。
+狭いと遊びづらく、没入感も減る。
+枠の中で遊んでもらう見返りが、枠のぶんの損失に見合わなかった。
 
-Artifacts は `frame-ancestors 'self'` を返すのでここには埋め込めない。
-それらのゲームは claim URL を使う。
+**そして、モードが一つ丸ごと消える。**
+埋め込みが無ければ SDK に親フレームを探す経路は要らず、`unlock()` は REST と claim の2つになる。
+実績一覧のような後から足す API も、postMessage 版を用意するかトークンを渡すかという分岐を持たずに済む。
+SDK は「コピペできる大きさに保つこと自体が仕様」なので、経路が減ることに独立した価値がある。
+
+そもそも Claude Artifacts は `frame-ancestors 'self'` を返すので埋め込めず、主要なホスティングの片方では最初から動いていなかった。
+
+`user_achievements.via` の check 制約に残る `'postmessage'` はそのままにする。
+その値で記録された行は実際にあり、制約から値を落とすにはテーブルを作り直すことになる。
+行の入ったテーブルは作り直せない(「マイグレーション」節)。
+書くのをやめるだけで、読める状態は保つ。
 
 ## GitHub Action
 
@@ -866,4 +871,4 @@ M2 の実装手本は deno-remix-reference(RP 側)と id.kbn.one 本体(IdP 側)
 - **実績の改竄耐性**:防がない。認証だけを固め、誰を見るかはフォローでユーザに選ばせる。全ユーザ横断のランキングは作らない。段階論も取らない
 - **フォロー**:一方向、作者とプレイヤーで分けない、プレイ履歴は全公開。仕様は「フォロー」節にある。通知は id.kbn.one の実装を使い、接続は後回し
 - **game id の予約と移譲**:id は作者ごとの名前空間に閉じるので、他人による横取りは起きない。確定するのは作者が承認した瞬間であり、承認待ちの投稿は何も確保しない。譲渡は行わない
-- **Artifacts の iframe 可否**:不可。実測したところ `content-security-policy: frame-ancestors 'self'` が返る。postMessage モードの対象外とする
+- **iframe 埋め込み**:行わない。ゲーム画面が狭くなるのが第一の理由で、モードが一つ減るのが第二。Artifacts はそもそも `content-security-policy: frame-ancestors 'self'` を返すので埋め込めない

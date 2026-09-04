@@ -231,7 +231,7 @@ Deno.test("adds up points across games, and keeps players apart", async () => {
       "kuboon/my-puzzle",
       "high_score",
       {
-        via: "postmessage",
+        via: "rest",
       },
     );
     await unlockAchievement(
