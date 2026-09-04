@@ -73,6 +73,11 @@ if (link) document.body.appendChild(link);
 スコアを付けるなら `gc.unlock("high_score", { score: 1200 })`。
 最高値だけが保存される。
 
+ゲームの中に実績画面を作るなら `gc.achievements()`。
+起動トークンが無ければ `null`。
+未取得の隠し実績は `title` が null で返る（何を伏せるかを知っているのはハブだけ）。
+キューで待っているぶんは `unlocked: true` かつ `pending: true` で入る。
+
 ### 読み込めない場合 (Claude Artifacts など)
 
 リンクを一つ出すだけでよい。

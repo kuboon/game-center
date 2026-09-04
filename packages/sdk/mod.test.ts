@@ -364,3 +364,118 @@ Deno.test("survives a hub that is unreachable", async () => {
     env.restore();
   }
 });
+
+Deno.test("lists the game's achievements with the player's progress", async () => {
+  const env = browser({
+    hash: "#gctoken=LAUNCH",
+    fetch: (input) =>
+      String(input).endsWith("/achievements")
+        ? Promise.resolve(
+          new Response(JSON.stringify({
+            achievements: [
+              {
+                key: "first_clear",
+                title: "はじめてのクリア",
+                description: null,
+                points: 10,
+                hidden: false,
+                unlocked: true,
+                unlockedAt: "2026-09-04T00:00:00Z",
+                score: null,
+              },
+              {
+                key: "secret",
+                title: null,
+                description: null,
+                points: 50,
+                hidden: true,
+                unlocked: false,
+                unlockedAt: null,
+                score: null,
+              },
+            ],
+          })),
+        )
+        : Promise.resolve(new Response("{}")),
+  });
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    await gc.ready;
+    const list = await gc.achievements();
+
+    assertEquals(list?.map((a) => [a.key, a.title, a.unlocked, a.pending]), [
+      ["first_clear", "はじめてのクリア", true, false],
+      // The hub keeps a hidden achievement's wording to itself until it is
+      // earned, which is the whole reason a game asks the hub rather than
+      // reading its own manifest.
+      ["secret", null, false, false],
+    ]);
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("shows a queued unlock as earned but not yet recorded", async () => {
+  let asked = 0;
+  const env = browser({
+    hash: "#gctoken=LAUNCH",
+    stored: {
+      [QUEUE]: JSON.stringify([{ key: "high_score", score: 1200 }]),
+    },
+    fetch: (input) => {
+      const url = String(input);
+      if (url.endsWith("/achievements")) {
+        asked++;
+        return Promise.resolve(
+          new Response(JSON.stringify({
+            achievements: [{
+              key: "high_score",
+              title: "ハイスコア",
+              description: null,
+              points: 30,
+              hidden: false,
+              unlocked: false,
+              unlockedAt: null,
+              score: null,
+            }],
+          })),
+        );
+      }
+      // Nothing gets through, so the queue stays put.
+      return Promise.reject(new Error("offline"));
+    },
+  });
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    await gc.ready;
+
+    const list = await gc.achievements();
+    assertEquals(list, [{
+      key: "high_score",
+      title: "ハイスコア",
+      description: null,
+      points: 30,
+      hidden: false,
+      unlocked: true,
+      pending: true,
+      unlockedAt: null,
+      score: 1200,
+    }]);
+
+    // The hub's half is kept; the queue is folded in on every call.
+    await gc.achievements();
+    assertEquals(asked, 1);
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("has no list to give without a launch token", async () => {
+  const env = browser();
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    assertEquals(await gc.achievements(), null);
+  } finally {
+    env.restore();
+  }
+});

@@ -15,6 +15,9 @@
  * // Whatever could not be sent is waiting. One link records all of it.
  * const link = gc.claimLink();
  * if (link) document.body.appendChild(link);
+ *
+ * // For a game that draws its own achievement screen.
+ * const list = await gc.achievements(); // null without a launch token
  * ```
  *
  * There are two ways to the hub. A player who arrived through the hub carries
@@ -58,6 +61,30 @@ export interface PendingUnlock {
   readonly score: number | null;
 }
 
+/**
+ * One of the game's achievements, with this player's progress.
+ *
+ * `pending` is the queue showing through: the player earned it, and the hub
+ * has not been told yet. A game drawing its own achievement screen should show
+ * it as earned — the player did the thing — and can use `pending` to say the
+ * record is still waiting.
+ */
+export interface Achievement {
+  readonly key: string;
+  /** Null while the hub keeps a hidden achievement's wording secret. */
+  readonly title: string | null;
+  readonly description: string | null;
+  readonly points: number;
+  readonly hidden: boolean;
+  /** True when the hub has it, or it is waiting in the queue. */
+  readonly unlocked: boolean;
+  /** True when it is earned but the hub has not recorded it. */
+  readonly pending: boolean;
+  /** When the hub recorded it. Null while it is only in the queue. */
+  readonly unlockedAt: string | null;
+  readonly score: number | null;
+}
+
 export interface UnlockResult {
   /** True when the hub has recorded it. */
   readonly recorded: boolean;
@@ -91,6 +118,8 @@ export class GameCenter {
 
   #token: string | null;
   #pending: PendingUnlock[];
+  /** The hub's answer to `/achievements`, before the queue is folded in. */
+  #defined: Omit<Achievement, "pending">[] | null = null;
 
   private constructor(options: InitOptions) {
     this.gameId = options.gameId;
@@ -125,7 +154,11 @@ export class GameCenter {
 
     if (this.#token) {
       const sent = await this.#post({ achievement: key, ...options });
-      if (sent) return { recorded: true, pending: this.#pending.length };
+      if (sent) {
+        // The hub's list now says something this one does not.
+        this.#defined = null;
+        return { recorded: true, pending: this.#pending.length };
+      }
     }
 
     this.#remember({ key, score });
@@ -155,7 +188,62 @@ export class GameCenter {
       (sent.results ?? []).filter((r) => r.ok).map((r) => r.key),
     );
     this.#keep(this.#pending.filter((item) => !kept.has(item.key)));
+    if (kept.size > 0) this.#defined = null;
     return this.#pending.length === 0;
+  }
+
+  /**
+   * The game's achievements, with what this player has done to them.
+   *
+   * For a game that wants to draw its own achievement screen. The hub is the
+   * one place that knows what a *hidden* achievement is called before it is
+   * earned — which is to say, that it must not be told — so `title` comes back
+   * null until the player has it.
+   *
+   * Whatever is still queued is folded in, so an unlock earned while offline
+   * shows as earned rather than missing. It carries `pending: true`, because
+   * the difference between "earned" and "recorded" is the player's to see.
+   *
+   * The hub's half is fetched once and kept; the queue is folded in on every
+   * call, so a fresh unlock shows up without asking again.
+   *
+   * @param options `refresh` asks the hub again rather than using what is kept
+   * @returns The list, or null without a launch token to ask with
+   */
+  async achievements(
+    options: { refresh?: boolean } = {},
+  ): Promise<Achievement[] | null> {
+    if (!this.#token) return null;
+    if (options.refresh) this.#defined = null;
+
+    if (!this.#defined) {
+      try {
+        const response = await fetch(`${this.hub}/api/game/v1/achievements`, {
+          headers: { authorization: `Bearer ${this.#token}` },
+        });
+        if (!response.ok) {
+          if (response.status === 401) this.#forgetToken();
+          return null;
+        }
+        const body = await response.json() as {
+          achievements?: Omit<Achievement, "pending">[];
+        };
+        this.#defined = body.achievements ?? [];
+      } catch {
+        return null;
+      }
+    }
+
+    const queued = new Map(this.#pending.map((item) => [item.key, item.score]));
+    return this.#defined.map((achievement) => {
+      const waiting = queued.get(achievement.key);
+      if (waiting === undefined) return { ...achievement, pending: false };
+      const score = waiting !== null &&
+          (achievement.score === null || waiting > achievement.score)
+        ? waiting
+        : achievement.score;
+      return { ...achievement, unlocked: true, pending: true, score };
+    });
   }
 
   /**

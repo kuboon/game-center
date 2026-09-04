@@ -156,6 +156,28 @@ if (link) document.body.appendChild(link);
 ロードのたびに同じ実績を報告してよい。
 2回目以降は解除日時も経路も動かない。
 
+### 実績の一覧を出す
+
+ゲームの中に実績画面を作るなら `gc.achievements()` を使う。
+
+```ts
+const list = await gc.achievements(); // 起動トークンが無ければ null
+for (const a of list ?? []) {
+  console.log(a.key, a.title, a.unlocked, a.pending, a.score);
+}
+```
+
+**題名はハブから取る。**
+未取得の隠し実績は `title` が null で返る。
+何を伏せるかを知っているのはハブだけで、ゲームの手元のマニフェストには本文が書いてあるからである。
+
+キューで待っているぶんも畳み込まれる。
+オフラインで取った実績が一覧から消えないよう `unlocked: true` になり、`pending: true` が「まだ記録されていない」を表す。
+「取った」と「記録された」の差はプレイヤーに見せるべきものなので、隠さず別の旗にしてある。
+
+ハブの側は一度だけ取って保持し、キューは呼ぶたびに畳む。
+直後に取った実績が、訊き直さずに一覧へ出る。
+
 ### claim リンクの形
 
 一覧は URL の**フラグメント**に載る。
@@ -218,7 +240,7 @@ CORS は全オリジンに開いている（Cookie を使わずヘッダのト�
 |---|---|
 | `POST /api/game/v1/unlock` | `{ achievement, score? }`、または一括で `{ unlocks: [{ key, score? }] }` |
 | `GET /api/game/v1/me` | プレイヤーの表示名と、このゲームでの解除済み実績 |
-| `GET /api/game/v1/achievements` | このゲームの実績定義。未解除の隠し実績は題名も説明も null |
+| `GET /api/game/v1/achievements` | このゲームの実績定義と、このプレイヤーの進捗(`unlocked` / `unlockedAt` / `score`)。未解除の隠し実績は題名も説明も null |
 
 どのエンドポイントも、トークンの `aud` にあるゲームの範囲に閉じている。
 プレイヤーについても「このゲームでの実績」しか見えない。
