@@ -170,7 +170,12 @@ score のない再報告は何もしない。
 https://example.github.io/my-puzzle/#gctoken=<JWT>
 ```
 
-起動トークンは game-center が署名する短命(2時間)の JWT で、claims は `sub`(ユーザ ID)、`aud`(`{author}/{slug}`)、`iss`、`exp` のみとする。
+起動トークンは game-center が署名する JWT で、claims は `sub`(ユーザ ID)、`aud`(`{author}/{slug}`)、`iss`、`exp` のみとする。
+有効期限は 7 日。
+これはゲームのホスト上の `localStorage` に残るので、ブックマークから翌日開いた人もその場で記録できる。
+数時間で切ると、その訪問は黙って記録されなくなり、手で確認する claim に落ちる。
+長くしても失うものは小さい。`aud` がゲームを、`sub` がプレイヤーを縛るので、この token にできるのは「そのプレイヤーがそのゲームの実績を解除する」ことだけであり、それは claim 画面でプレイヤー自身がいつでもできることである。
+セッションではない。
 署名鍵は `RP_SIGNING_KEY_JWK`(ES256 の private JWK)で与える。
 未設定なら起動トークンは発行も検証もせず 503 を返す。
 isolate ごとに鍵を生成すると、発行した isolate 以外では検証が通らないためである。
