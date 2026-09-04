@@ -17,8 +17,10 @@ import {
   listUnlocksForGame,
   UnknownAchievementError,
   unlockAchievement,
+  unlockMany,
 } from "../../db/unlocks.ts";
 import { authenticateLaunch } from "../../lib/auth.ts";
+import { isBulkBody, parseUnlocks } from "../../lib/unlock_body.ts";
 import type { routes } from "../../routes.ts";
 import { apiError, apiJson } from "../../utils/api.ts";
 
@@ -27,11 +29,27 @@ export const gameUnlockAction = {
     const auth = await authenticateLaunch(context.request);
     if (!auth.ok) return auth.response;
 
-    let body: { achievement?: unknown; score?: unknown };
+    let body: { achievement?: unknown; score?: unknown; unlocks?: unknown };
     try {
       body = await context.request.json();
     } catch {
       return apiError("Body must be JSON", 400);
+    }
+
+    // A game replaying what it kept while it could not reach the hub sends the
+    // whole queue at once. One unknown key does not sink the rest, so the
+    // answer is per entry rather than a status code.
+    if (isBulkBody(body)) {
+      const parsed = parseUnlocks(body.unlocks);
+      if (!parsed.ok) return apiError(parsed.message, 400);
+      const results = await unlockMany(
+        requireDb(),
+        auth.user.id,
+        auth.launch.gameId,
+        parsed.unlocks,
+        "rest",
+      );
+      return apiJson({ results });
     }
 
     const key = body.achievement;

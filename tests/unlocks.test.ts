@@ -16,6 +16,7 @@ import {
   totalPoints,
   UnknownAchievementError,
   unlockAchievement,
+  unlockMany,
 } from "../server/db/unlocks.ts";
 import { upsertUser } from "../server/db/users.ts";
 import { type Client, migratedDb } from "./support/db.ts";
@@ -284,5 +285,73 @@ Deno.test("lists one game's unlocks in manifest order", async () => {
     );
     assertEquals(unlocks.map((u) => u.key), ["first_clear", "high_score"]);
     assert(unlocks.every((u) => u.gameId === "kuboon/my-puzzle"));
+  });
+});
+
+Deno.test("records a whole queue in one call", async () => {
+  await migratedDb(async (client) => {
+    const player = await playable(client);
+    const results = await unlockMany(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      [{ key: "first_clear" }, { key: "high_score", score: 1200 }],
+      "claim",
+    );
+
+    assertEquals(results.map((r) => [r.key, r.ok]), [
+      ["first_clear", true],
+      ["high_score", true],
+    ]);
+    assertEquals((await listUnlocks(client, player.id)).length, 2);
+    assertEquals(await totalPoints(client, player.id), 40);
+  });
+});
+
+Deno.test("answers for an unknown key without losing the rest", async () => {
+  await migratedDb(async (client) => {
+    const player = await playable(client);
+    // A game replaying a queue it kept while offline can be carrying an
+    // achievement the manifest has since dropped. Refusing the batch would
+    // cost the player the ones that are still real.
+    const results = await unlockMany(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      [{ key: "invented" }, { key: "first_clear" }],
+      "claim",
+    );
+
+    assertEquals(results.map((r) => [r.key, r.ok]), [
+      ["invented", false],
+      ["first_clear", true],
+    ]);
+    assertEquals((await listUnlocks(client, player.id)).length, 1);
+  });
+});
+
+Deno.test("folds a key repeated in one call, keeping the best score", async () => {
+  await migratedDb(async (client) => {
+    const player = await playable(client);
+    // Two rows for one achievement would race each other into the unique
+    // constraint, so the same key can only appear once by the time it is sent.
+    const results = await unlockMany(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      [
+        { key: "high_score", score: 900 },
+        { key: "high_score", score: 1200 },
+      ],
+      "claim",
+    );
+
+    assertEquals(results.length, 1);
+    const unlocks = await listUnlocksForGame(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+    );
+    assertEquals(unlocks.map((u) => [u.key, u.score]), [["high_score", 1200]]);
   });
 });

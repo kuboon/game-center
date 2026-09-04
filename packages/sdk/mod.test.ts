@@ -2,10 +2,11 @@
 // The package is scoped to browser libs so a Deno API cannot slip into a file
 // that ships inside someone's game. The tests need Deno, and only the tests.
 /**
- * The SDK's fallback chain, with the browser stubbed.
+ * The SDK's two ways to the hub, with the browser stubbed.
  *
- * What matters is the order and the floor: the REST API first, and a claim URL
- * when it could not be used — never an error, never a popup.
+ * What matters is the floor: an unlock the hub could not be told about is kept
+ * rather than lost, and one link records everything that is waiting — never an
+ * error, never a popup.
  */
 
 import { assert, assertEquals } from "@std/assert";
@@ -15,64 +16,123 @@ import { GameCenter } from "./mod.ts";
 const HUB = "https://hub.example";
 const GAME = "kuboon/my-puzzle";
 
-/** Install just enough browser for the SDK, and undo it afterwards. */
+/**
+ * Install just enough browser for the SDK, and undo it afterwards.
+ *
+ * Defined rather than assigned: Deno's own `localStorage` is a getter, so
+ * `globalThis.localStorage = stub` does nothing at all — silently, which means
+ * a test would keep passing while reading the real store and leaking its
+ * queue into the next test.
+ */
 function browser(
-  { hash = "", fetch: fetchImpl }: {
+  { hash = "", stored = {}, fetch: fetchImpl }: {
     hash?: string;
+    /** What `localStorage` already holds, as a returning player's would. */
+    stored?: Record<string, string>;
     fetch?: typeof globalThis.fetch;
   } = {},
 ) {
-  const store = new Map<string, string>();
-  const self = globalThis as unknown as Record<string, unknown>;
-  const saved: Record<string, unknown> = {};
-  const keys = ["location", "history", "localStorage", "fetch"];
-  for (const key of keys) saved[key] = self[key];
+  const store = new Map<string, string>(Object.entries(stored));
+  const saved = new Map<string, PropertyDescriptor | undefined>();
+  const install = (key: string, value: unknown) => {
+    if (!saved.has(key)) {
+      saved.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
+    }
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+  };
 
-  self.location = { hash, pathname: "/game/", search: "" };
-  self.history = { replaceState: () => {} };
-  self.localStorage = {
+  install("location", { hash, pathname: "/game/", search: "" });
+  install("history", { replaceState: () => {} });
+  install("localStorage", {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => store.set(k, v),
     removeItem: (k: string) => store.delete(k),
-  };
-  if (fetchImpl) self.fetch = fetchImpl;
+  });
+  if (fetchImpl) install("fetch", fetchImpl);
 
   return {
+    store,
     restore() {
-      for (const key of keys) {
-        if (saved[key] === undefined) delete self[key];
-        else self[key] = saved[key];
+      for (const [key, descriptor] of saved) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else delete (globalThis as unknown as Record<string, unknown>)[key];
       }
     },
   };
 }
 
 const ok = () => Promise.resolve(new Response("{}", { status: 200 }));
+const QUEUE = `gc:pending:${GAME}`;
 
-Deno.test("falls back to a claim URL when nothing else can reach the hub", async () => {
+Deno.test("queues an unlock nobody can be told about", async () => {
   const env = browser();
   try {
     const gc = GameCenter.init({ gameId: GAME, hub: HUB });
     const result = await gc.unlock("first_clear");
 
-    // The floor. It works from a Claude Artifact, which is the whole point.
-    assertEquals(result.mode, "claim");
     assertEquals(result.recorded, false);
-    assertEquals(result.claimUrl, `${HUB}/claim/@${GAME}/first_clear`);
+    assertEquals(result.pending, 1);
+    assertEquals(gc.pending, [{ key: "first_clear", score: null }]);
   } finally {
     env.restore();
   }
 });
 
-Deno.test("puts the score in the claim URL", async () => {
+Deno.test("one claim link carries everything waiting", async () => {
   const env = browser();
   try {
     const gc = GameCenter.init({ gameId: GAME, hub: HUB });
-    const result = await gc.unlock("high_score", { score: 1200 });
+    await gc.unlock("first_clear");
+    await gc.unlock("high_score", { score: 1200 });
+
     assertEquals(
-      result.claimUrl,
-      `${HUB}/claim/@${GAME}/high_score?score=1200`,
+      gc.claimUrl(),
+      `${HUB}/claim/@${GAME}#gc=first_clear,high_score:1200`,
     );
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("offers no link when there is nothing to record", () => {
+  const env = browser();
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    assertEquals(gc.claimUrl(), null);
+    assertEquals(gc.claimLink(), null);
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("keeps the higher score when the same key comes twice", async () => {
+  const env = browser();
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    await gc.unlock("high_score", { score: 1200 });
+    await gc.unlock("high_score", { score: 900 });
+
+    assertEquals(gc.pending, [{ key: "high_score", score: 1200 }]);
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("the queue survives the page being closed", async () => {
+  const env = browser();
+  try {
+    const first = GameCenter.init({ gameId: GAME, hub: HUB });
+    await first.unlock("first_clear");
+    assert(env.store.has(QUEUE));
+
+    // A second visit, with whatever the first one left behind.
+    const again = browser({ stored: Object.fromEntries(env.store) });
+    try {
+      const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+      assertEquals(gc.pending, [{ key: "first_clear", score: null }]);
+    } finally {
+      again.restore();
+    }
   } finally {
     env.restore();
   }
@@ -95,11 +155,140 @@ Deno.test("uses the launch token the hub left in the fragment", async () => {
     const gc = GameCenter.init({ gameId: GAME, hub: HUB });
     const result = await gc.unlock("first_clear", { score: 10 });
 
-    assertEquals(result.mode, "rest");
     assertEquals(result.recorded, true);
+    assertEquals(result.pending, 0);
     const unlock = calls.find((c) => c.url.endsWith("/unlock"));
     assertEquals(unlock?.auth, "Bearer LAUNCH");
     assertEquals(unlock?.body, { achievement: "first_clear", score: 10 });
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("sends a waiting queue as soon as a token turns up", async () => {
+  const sent: unknown[] = [];
+  const env = browser({
+    hash: "#gctoken=LAUNCH",
+    stored: {
+      [QUEUE]: JSON.stringify([
+        { key: "first_clear", score: null },
+        { key: "high_score", score: 1200 },
+      ]),
+    },
+    fetch: (input, init) => {
+      if (String(input).endsWith("/me")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ player: { name: "kuboon" } })),
+        );
+      }
+      sent.push(JSON.parse(String(init?.body)));
+      return Promise.resolve(
+        new Response(JSON.stringify({
+          results: [
+            { key: "first_clear", ok: true },
+            { key: "high_score", ok: true },
+          ],
+        })),
+      );
+    },
+  });
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    await gc.ready;
+
+    assertEquals(sent, [{
+      unlocks: [
+        { key: "first_clear", score: null },
+        { key: "high_score", score: 1200 },
+      ],
+    }]);
+    assertEquals(gc.pending, []);
+    assertEquals(env.store.has(QUEUE), false);
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("keeps an unlock the hub would not take", async () => {
+  const env = browser({
+    hash: "#gctoken=LAUNCH",
+    stored: {
+      [QUEUE]: JSON.stringify([
+        { key: "first_clear", score: null },
+        { key: "retired_one", score: null },
+      ]),
+    },
+    fetch: (input) =>
+      String(input).endsWith("/me")
+        ? Promise.resolve(new Response("{}"))
+        : Promise.resolve(
+          new Response(JSON.stringify({
+            results: [
+              { key: "first_clear", ok: true },
+              { key: "retired_one", ok: false },
+            ],
+          })),
+        ),
+  });
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    await gc.ready;
+
+    // A manifest that later declares it can still take this unlock, so it
+    // stays rather than being thrown away on the hub's say-so.
+    assertEquals(gc.pending, [{ key: "retired_one", score: null }]);
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("drops what the hub already has", async () => {
+  const env = browser({
+    hash: "#gctoken=LAUNCH",
+    stored: {
+      [QUEUE]: JSON.stringify([
+        { key: "first_clear", score: null },
+        { key: "high_score", score: 900 },
+      ]),
+    },
+    fetch: (input) =>
+      String(input).endsWith("/me")
+        ? Promise.resolve(
+          new Response(JSON.stringify({
+            player: { name: "kuboon" },
+            achievements: [
+              { key: "first_clear", score: null },
+              { key: "high_score", score: 1200 },
+            ],
+          })),
+        )
+        : Promise.resolve(new Response(JSON.stringify({ results: [] }))),
+  });
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    await gc.ready;
+
+    // Both are already recorded, and the kept score is the higher one, so
+    // there is nothing left to ask the player about.
+    assertEquals(gc.pending, []);
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("forgets what the claim page says it recorded", () => {
+  const env = browser({
+    hash: "#gcclaimed=first_clear",
+    stored: {
+      [QUEUE]: JSON.stringify([
+        { key: "first_clear", score: null },
+        { key: "high_score", score: 1200 },
+      ]),
+    },
+  });
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    assertEquals(gc.pending, [{ key: "high_score", score: 1200 }]);
   } finally {
     env.restore();
   }
@@ -119,10 +308,10 @@ Deno.test("stops using a token the hub has rejected", async () => {
     await gc.ready;
     assertEquals(gc.player, null);
 
-    assertEquals((await gc.unlock("a")).mode, "claim");
+    assertEquals((await gc.unlock("a")).recorded, false);
     const spent = attempts;
     // Every later unlock would otherwise wait on a request that cannot succeed.
-    assertEquals((await gc.unlock("b")).mode, "claim");
+    assertEquals((await gc.unlock("b")).recorded, false);
     assertEquals(attempts, spent);
   } finally {
     env.restore();
@@ -142,7 +331,7 @@ Deno.test("learns who is playing when the hub says", async () => {
   try {
     const gc = GameCenter.init({ gameId: GAME, hub: HUB });
     await gc.ready;
-    assertEquals(gc.player?.name, "kuboon");
+    assertEquals(gc.player, { name: "kuboon" });
   } finally {
     env.restore();
   }
@@ -167,10 +356,10 @@ Deno.test("survives a hub that is unreachable", async () => {
   try {
     const gc = GameCenter.init({ gameId: GAME, hub: HUB });
     await gc.ready;
+
     const result = await gc.unlock("first_clear");
-    // Never throws, never navigates. The claim URL still works later.
-    assert(result.claimUrl);
     assertEquals(result.recorded, false);
+    assert(gc.claimUrl()?.includes("first_clear"));
   } finally {
     env.restore();
   }

@@ -28,6 +28,7 @@ const CLIENT_ENTRIES = [
   "dev_console.tsx",
   "play_button.tsx",
   "claim_panel.tsx",
+  "claim_all_panel.tsx",
   "achievement_list.tsx",
   "prompt_card.tsx",
   "follow_button.tsx",

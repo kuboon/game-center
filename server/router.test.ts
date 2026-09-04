@@ -409,3 +409,27 @@ Deno.test("the landing page ranks nobody", async () => {
     assertEquals(html.includes(ranking), false, ranking);
   }
 });
+
+Deno.test("previewing a claim needs a session", async () => {
+  // The preview says what a player has already recorded, which is a fact about
+  // that player. Without a proof there is nobody to answer for.
+  const response = await router.fetch(
+    new Request("http://localhost/api/internal/claim/preview", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gameId: "kuboon/my-puzzle", keys: ["a"] }),
+    }),
+  );
+  assertEquals(response.status, 401);
+  assertEquals(response.headers.get("cache-control"), "no-store");
+});
+
+Deno.test("GET /claim/... says so when the game is unknown", async () => {
+  const response = await router.fetch(
+    new Request("http://localhost/claim/@kuboon/nope", {
+      headers: { "rmx-frame": "1" },
+    }),
+  );
+  assertEquals(response.status, 200);
+  assertStringIncludes(await response.text(), "このゲームは見つかりません");
+});

@@ -3,19 +3,32 @@
  * own pages turn a signed-in player into something a game can use.
  *
  * Launching mints a token and hands back the URL to open. Claiming is the
- * fallback path: a game that cannot fetch anything sends the player here with
- * a link, and the player confirms the unlock themselves.
+ * fallback path: a game that could not reach the hub sends the player here
+ * with a link naming everything it has waiting, and the player confirms.
+ *
+ * Confirming is two calls, because the player is shown what will happen before
+ * it happens. `preview` reads: it turns the keys in the link into titles and
+ * says which are already recorded. `claim` writes. Neither trusts the link —
+ * the keys come from a page the game controls, so the hub answers only for
+ * achievements its own manifest declares.
  */
 
 import type { Action } from "@remix-run/fetch-router";
 
 import { requireDb } from "../../db/client.ts";
-import { findGame } from "../../db/games.ts";
+import { findGame, listAchievements } from "../../db/games.ts";
 import {
+  listUnlocksForGame,
   UnknownAchievementError,
   unlockAchievement,
+  unlockMany,
 } from "../../db/unlocks.ts";
 import { authenticateSession } from "../../lib/auth.ts";
+import {
+  isBulkBody,
+  MAX_UNLOCKS_PER_CALL,
+  parseUnlocks,
+} from "../../lib/unlock_body.ts";
 import {
   launchUrl,
   mintLaunchToken,
@@ -63,6 +76,7 @@ export const internalClaimAction = {
       gameId?: unknown;
       key?: unknown;
       score?: unknown;
+      unlocks?: unknown;
     };
     try {
       body = await context.request.json();
@@ -72,6 +86,20 @@ export const internalClaimAction = {
     if (typeof body.gameId !== "string" || !body.gameId) {
       return apiError("gameId is required", 400);
     }
+
+    if (isBulkBody(body)) {
+      const parsed = parseUnlocks(body.unlocks);
+      if (!parsed.ok) return apiError(parsed.message, 400);
+      const results = await unlockMany(
+        requireDb(),
+        auth.user.id,
+        body.gameId,
+        parsed.unlocks,
+        "claim",
+      );
+      return apiJson({ results });
+    }
+
     if (typeof body.key !== "string" || !body.key) {
       return apiError("key is required", 400);
     }
@@ -101,3 +129,65 @@ export const internalClaimAction = {
     }
   },
 } satisfies Action<typeof routes.internalClaim>;
+
+export const internalClaimPreviewAction = {
+  async handler(context) {
+    const auth = await authenticateSession(context);
+    if (!auth.ok) return auth.response;
+
+    let body: { gameId?: unknown; keys?: unknown };
+    try {
+      body = await context.request.json();
+    } catch {
+      return apiError("Body must be JSON", 400);
+    }
+    if (typeof body.gameId !== "string" || !body.gameId) {
+      return apiError("gameId is required", 400);
+    }
+    if (!Array.isArray(body.keys) || body.keys.length === 0) {
+      return apiError("keys must be a non-empty array", 400);
+    }
+    if (body.keys.length > MAX_UNLOCKS_PER_CALL) {
+      return apiError(
+        `keys must hold at most ${MAX_UNLOCKS_PER_CALL} entries`,
+        400,
+      );
+    }
+    if (!body.keys.every((key) => typeof key === "string" && key)) {
+      return apiError("keys must be strings", 400);
+    }
+
+    const client = requireDb();
+    const game = await findGame(client, body.gameId);
+    if (!game) return apiError("Unknown game", 404);
+
+    const [defined, unlocked] = await Promise.all([
+      listAchievements(client, game.id),
+      listUnlocksForGame(client, auth.user.id, game.id),
+    ]);
+    const byKey = new Map(defined.map((a) => [a.key, a]));
+    const already = new Map(unlocked.map((u) => [u.key, u]));
+
+    // Only what the link named, and only what the manifest declares. A key the
+    // hub does not know is answered as unknown rather than dropped: the player
+    // is about to be told what will be recorded, and a line that quietly
+    // disappears is worse than one that says it cannot be recorded.
+    const items = (body.keys as string[]).map((key) => {
+      const achievement = byKey.get(key);
+      if (!achievement) return { key, known: false as const };
+      const have = already.get(key);
+      return {
+        key,
+        known: true as const,
+        title: achievement.title,
+        description: achievement.description,
+        points: achievement.points,
+        hidden: achievement.hidden,
+        unlocked: have !== undefined,
+        score: have?.score ?? null,
+      };
+    });
+
+    return apiJson({ game: { id: game.id, title: game.title }, items });
+  },
+} satisfies Action<typeof routes.internalClaimPreview>;
