@@ -406,6 +406,101 @@ function toGameWithAuthor(row: Record<string, unknown>): GameWithAuthor {
   };
 }
 
+/** What became of a game its author asked to remove. */
+export type RetireOutcome = "deleted" | "withdrawn";
+
+/**
+ * How many of this game's achievements players have unlocked.
+ *
+ * The number that decides what removing the game can mean, so the dashboard
+ * can say which it will be before the author presses anything.
+ */
+export async function countUnlocksForGame(
+  client: Client,
+  gameId: string,
+): Promise<number> {
+  const result = await client.execute({
+    sql: `select count(*) as n
+            from user_achievements
+            join achievements on achievements.id = user_achievements.achievement_id
+           where achievements.game_id = ?`,
+    args: [gameId],
+  });
+  return Number(result.rows[0]?.n ?? 0);
+}
+
+/**
+ * Take a game out of the hub, as far as it can go without taking anyone
+ * else's records with it.
+ *
+ * A game nobody has played is deleted outright: nothing is lost, and the slug
+ * goes back to its author, who most likely registered the wrong URL. A game
+ * somebody has played is only withdrawn — it leaves the catalog and stops
+ * accepting unlocks, and every record earned in it stays where it is. The
+ * author is removing their game, not editing other people's profiles, and the
+ * same reasoning already keeps a dropped achievement as `retired` rather than
+ * deleting it.
+ *
+ * Which one happens is decided by the database rather than by a count read
+ * beforehand: the first statement removes this game's achievements only while
+ * the game has no unlocks at all, the second removes the game only if no
+ * achievements are left, and the third hides whatever survived. So an unlock
+ * arriving mid-flight cannot leave a record pointing at a deleted achievement
+ * — it turns the delete into a withdrawal, which is the safe direction.
+ *
+ * @param client Database to write to
+ * @param gameId The game to remove
+ * @returns Which of the two happened
+ */
+export async function retireGame(
+  client: Client,
+  gameId: string,
+): Promise<RetireOutcome> {
+  await client.batch([
+    {
+      sql: `delete from achievements
+             where game_id = ?
+               and not exists (
+                 select 1
+                   from user_achievements
+                   join achievements played
+                     on played.id = user_achievements.achievement_id
+                  where played.game_id = ?
+               )`,
+      args: [gameId, gameId],
+    },
+    {
+      sql: `delete from games
+             where id = ?
+               and not exists (
+                 select 1 from achievements where achievements.game_id = games.id
+               )`,
+      args: [gameId],
+    },
+    {
+      sql: `update games
+               set status = 'hidden', updated_at = datetime('now')
+             where id = ?`,
+      args: [gameId],
+    },
+  ], "write");
+
+  return await findGame(client, gameId) ? "withdrawn" : "deleted";
+}
+
+/** Put a withdrawn game back in the catalog. */
+export async function restoreGame(
+  client: Client,
+  gameId: string,
+): Promise<void> {
+  await client.execute({
+    sql: `update games
+             set status = 'active', updated_at = datetime('now')
+           where id = ?`,
+    args: [gameId],
+  });
+}
+
 /** Games a player wrote, whatever their status. */
 export async function listGamesOwnedBy(
   client: Client,

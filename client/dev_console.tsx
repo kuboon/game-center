@@ -48,6 +48,8 @@ interface Game {
   manifestUrl: string | null;
   status: string;
   achievements: Achievement[];
+  /** How many unlocks players hold. Decides what removing it can mean. */
+  unlocks: number;
 }
 
 /** A submission naming this account as author, not yet agreed to. */
@@ -99,6 +101,8 @@ export const DevConsole = clientEntry(
 
     let gameUrl = "";
     let manifestText = "";
+    /** Which game's removal is waiting for a second press. */
+    let confirming: string | null = null;
 
     const session = mountSession(handle, refresh);
 
@@ -219,6 +223,61 @@ export const DevConsole = clientEntry(
             ? `${result.game?.title} を登録しました`
             : `${entry.title} の登録を却下しました`,
         };
+        await refresh();
+      } catch (cause) {
+        outcome = { ok: false, text: (cause as Error).message };
+      } finally {
+        busy = false;
+        handle.update();
+      }
+    };
+
+    /**
+     * Removing a game asks twice.
+     *
+     * Not a `confirm()`, which cannot say what is about to happen: the two
+     * outcomes differ, and which one it is depends on whether anybody has
+     * played. So the row itself opens and spells it out.
+     */
+    const remove = async (game: Game) => {
+      busy = true;
+      outcome = null;
+      handle.update();
+      try {
+        const response = await api(`/api/internal/games/@${game.id}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) throw new Error(await messageOf(response));
+        const { outcome: what } = await response.json() as {
+          outcome: "deleted" | "withdrawn";
+        };
+        outcome = {
+          ok: true,
+          text: what === "deleted"
+            ? `${game.title} を削除しました`
+            : `${game.title} を公開停止にしました。解除済みの実績は残ります`,
+        };
+        confirming = null;
+        await refresh();
+      } catch (cause) {
+        outcome = { ok: false, text: (cause as Error).message };
+      } finally {
+        busy = false;
+        handle.update();
+      }
+    };
+
+    const restore = async (game: Game) => {
+      busy = true;
+      outcome = null;
+      handle.update();
+      try {
+        const response = await api(
+          `/api/internal/games/@${game.id}/restore`,
+          { method: "POST" },
+        );
+        if (!response.ok) throw new Error(await messageOf(response));
+        outcome = { ok: true, text: `${game.title} を再公開しました` };
         await refresh();
       } catch (cause) {
         outcome = { ok: false, text: (cause as Error).message };
@@ -433,8 +492,71 @@ export const DevConsole = clientEntry(
                           {game.url}
                         </a>
                         <p class="text-sm opacity-70">
-                          実績 {game.achievements.length} 件
+                          実績 {game.achievements.length} 件{game.unlocks > 0
+                            ? ` / 解除 ${game.unlocks} 件`
+                            : null}
                         </p>
+                        {game.status === "hidden"
+                          ? (
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                              <span class="text-sm opacity-70">
+                                公開停止中。カタログに出ず、新しい解除も受け付けません。
+                              </span>
+                              <button
+                                type="button"
+                                class="btn btn-outline btn-xs"
+                                disabled={busy}
+                                mix={[on("click", () => void restore(game))]}
+                              >
+                                再公開する
+                              </button>
+                            </div>
+                          )
+                          : confirming === game.id
+                          ? (
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                              <span class="text-sm">
+                                {game.unlocks > 0
+                                  ? `${game.unlocks} 件の解除があるので、削除ではなく公開停止になります。プレイヤーの記録はそのまま残ります。`
+                                  : "まだ誰も遊んでいないので、完全に削除します。この id は空きに戻ります。"}
+                              </span>
+                              <button
+                                type="button"
+                                class="btn btn-error btn-xs"
+                                disabled={busy}
+                                mix={[on("click", () => void remove(game))]}
+                              >
+                                {game.unlocks > 0
+                                  ? "公開停止にする"
+                                  : "削除する"}
+                              </button>
+                              <button
+                                type="button"
+                                class="btn btn-ghost btn-xs"
+                                disabled={busy}
+                                mix={[on("click", () => {
+                                  confirming = null;
+                                  handle.update();
+                                })]}
+                              >
+                                やめる
+                              </button>
+                            </div>
+                          )
+                          : (
+                            <button
+                              type="button"
+                              class="link mt-1 text-sm opacity-70"
+                              disabled={busy}
+                              mix={[on("click", () => {
+                                confirming = game.id;
+                                outcome = null;
+                                handle.update();
+                              })]}
+                            >
+                              {game.unlocks > 0 ? "公開停止" : "削除"}
+                            </button>
+                          )}
                       </li>
                     ))}
                   </ul>
