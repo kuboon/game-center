@@ -433,3 +433,20 @@ Deno.test("GET /claim/... says so when the game is unknown", async () => {
   assertEquals(response.status, 200);
   assertStringIncludes(await response.text(), "このゲームは見つかりません");
 });
+
+Deno.test("removing a game needs a session", async () => {
+  // Both directions: whose game it is, and whether it exists at all, are only
+  // answerable to a proof.
+  const requests: Array<[string, RequestInit]> = [
+    ["/api/internal/games/@kuboon/my-puzzle", { method: "DELETE" }],
+    ["/api/internal/games/@kuboon/my-puzzle/restore", { method: "POST" }],
+  ];
+
+  for (const [path, init] of requests) {
+    const response = await router.fetch(
+      new Request(`http://localhost${path}`, init),
+    );
+    assertEquals(response.status, 401, `${init.method} ${path}`);
+    assertEquals(response.headers.get("cache-control"), "no-store");
+  }
+});

@@ -298,6 +298,28 @@ id は承認の瞬間に組み立てて取り、同じ slug を狙う複数の�
 **貼り付け登録は本人しかできない。**
 URL の裏付けがないので、他人の名義で貼れてしまうと 1 だけで登録が成立してしまう。
 
+### 登録の取り消しは、遊ばれたかで意味が変わる
+
+作者は `/dev` から自分のゲームを取り消せる。
+何が起きるかは、そのゲームが遊ばれたかどうかで決まる。
+
+誰も実績を解除していなければ、**行ごと削除する**。
+失われるものが何も無く、id は作者の名前空間の空きに戻る。
+取り消す理由はたいてい URL を間違えて登録したことなので、跡が残らないほうがよい。
+
+誰かが解除していれば、**公開停止にするだけ**にする(`status = 'hidden'`)。
+カタログから消え、新しい解除も受け付けなくなるが、**プレイヤーの記録には一切触らない**。
+作者が消しているのは自分のゲームであって、他人のプロフィールではない。
+マニフェストから消えた実績を削除せず `retired` にするのと同じ理由である。
+
+どちらになるかは、数えてから決めるのではなく SQL に決めさせる。
+「解除が一件も無いときだけ実績を消す」「実績が残っていないときだけゲームを消す」「生き残ったものを hidden にする」を一つの batch で流すので、途中で解除が届いても削除が公開停止に変わるだけで済む。
+記録が消えた実績を指したまま残る、という状態にはならない。
+
+公開停止は取り消せる(再公開)。
+`registerGame` は `status` を触らないので、CI が push し続けても公開停止は解けない。
+戻すのは作者が画面で決めることである。
+
 ### ハンドルは選ばせない
 
 作者を指す名前(ハンドル)は、初回サインイン時に id.kbn.one の userId をそのまま入れる。
@@ -501,6 +523,8 @@ CORS ヘッダを返さないため、他オリジンのページからは呼べ
 | `POST /api/internal/claim` | claim ページの確認ボタンから実績解除 |
 | `POST /api/internal/launch` | 起動トークンを発行し、フラグメント付きの起動 URL を返す |
 | `GET`/`POST` `/api/internal/games` | 自分のゲームと承認待ちの一覧、URL 登録または貼り付け登録 |
+| `DELETE` `/api/internal/games/@{handle}/{slug}` | 登録の取り消し。遊ばれていなければ削除、遊ばれていれば公開停止 |
+| `POST` `/api/internal/games/@{handle}/{slug}/restore` | 公開停止からの再公開 |
 | `POST`/`DELETE` `/api/internal/registrations/{id}` | 承認待ちの承認 / 却下 |
 
 登録は POST だけで足り、PATCH は用意しない。
@@ -827,6 +851,8 @@ POST   /api/internal/follows          { handle }   → 201 / 200 (冪等)
 DELETE /api/internal/follows/:handle               → 204 (フォローしていなくても 204)
 GET    /api/internal/follows/:handle               → { following, followers, followees }
 GET    /api/internal/games/@:handle/:slug/peers    → フォロー中の人の解除
+DELETE /api/internal/games/@:handle/:slug          → 削除または公開停止
+POST   /api/internal/games/@:handle/:slug/restore  → 再公開
 ```
 
 DPoP 認証、CORS なし。

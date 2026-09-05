@@ -12,6 +12,8 @@ import { staticFiles } from "@remix-run/static-middleware";
 import {
   internalApproveAction,
   internalDismissAction,
+  internalGameRestoreAction,
+  internalGameRetireAction,
   internalGamesAction,
   internalGamesRegisterAction,
 } from "./controllers/api/internal_games.ts";
@@ -118,6 +120,8 @@ router.get(routes.internalFollowers, internalFollowersAction);
 router.post(routes.internalFollowersSeen, internalFollowersSeenAction);
 router.get(routes.internalTimeline, internalTimelineAction);
 router.get(routes.internalGamePeers, internalGamePeersAction);
+router.delete(routes.internalGameRetire, internalGameRetireAction);
+router.post(routes.internalGameRestore, internalGameRestoreAction);
 
 router.post(routes.gameUnlock, gameUnlockAction);
 router.get(routes.gameMe, gameMeAction);

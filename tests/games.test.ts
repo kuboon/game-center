@@ -11,12 +11,21 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 
 import type { GameManifest } from "@game-center/protocol";
 import {
+  countUnlocksForGame,
+  findGame,
   GameOwnershipError,
   listAchievements,
   listGames,
   listGamesOwnedBy,
   registerGame,
+  restoreGame,
+  retireGame,
 } from "../server/db/games.ts";
+import {
+  listUnlocks,
+  UnknownAchievementError,
+  unlockAchievement,
+} from "../server/db/unlocks.ts";
 import { upsertUser } from "../server/db/users.ts";
 import { type Client, migratedDb } from "./support/db.ts";
 
@@ -316,5 +325,187 @@ Deno.test("orders achievements the way the manifest does", async () => {
     const achievements = await listAchievements(client, "kuboon/my-puzzle");
     assertEquals(achievements.map((a) => a.key), ["no_hints", "first_clear"]);
     assert(achievements[0].hidden);
+  });
+});
+
+Deno.test("deletes a game nobody has played", async () => {
+  await migratedDb(async (client) => {
+    const author = await upsertUser(client, "idp-kuboon", "kuboon");
+    await registerGame(
+      client,
+      { ownerId: author.id, authorHandle: "kuboon", manifestUrl: MANIFEST_URL },
+      manifest(),
+      GAME_URL,
+    );
+
+    assertEquals(await retireGame(client, "kuboon/my-puzzle"), "deleted");
+    assertEquals(await findGame(client, "kuboon/my-puzzle"), null);
+    assertEquals(await listAchievements(client, "kuboon/my-puzzle"), []);
+
+    // The slug goes back to its author, which is the point: the usual reason
+    // to remove a game is having registered the wrong URL.
+    const again = await registerGame(
+      client,
+      { ownerId: author.id, authorHandle: "kuboon", manifestUrl: MANIFEST_URL },
+      manifest(),
+      GAME_URL,
+    );
+    assertEquals(again.created, true);
+  });
+});
+
+Deno.test("withdraws a game somebody has played, keeping their record", async () => {
+  await migratedDb(async (client) => {
+    const author = await upsertUser(client, "idp-kuboon", "kuboon");
+    const player = await upsertUser(client, "idp-player", "player");
+    await registerGame(
+      client,
+      { ownerId: author.id, authorHandle: "kuboon", manifestUrl: MANIFEST_URL },
+      manifest(),
+      GAME_URL,
+    );
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      { via: "rest" },
+    );
+
+    assertEquals(await retireGame(client, "kuboon/my-puzzle"), "withdrawn");
+
+    // The author removed their game; they did not edit anyone's profile.
+    const unlocks = await listUnlocks(client, player.id);
+    assertEquals(unlocks.map((unlock) => unlock.key), ["first_clear"]);
+    assertEquals(
+      (await listAchievements(client, "kuboon/my-puzzle")).length,
+      2,
+    );
+
+    const game = await findGame(client, "kuboon/my-puzzle");
+    assertEquals(game?.status, "hidden");
+    // Gone from the catalog, but still reachable by the links already handed
+    // out — the records point at it.
+    assertEquals(await listGames(client), []);
+  });
+});
+
+Deno.test("a withdrawn game takes no more unlocks", async () => {
+  await migratedDb(async (client) => {
+    const author = await upsertUser(client, "idp-kuboon", "kuboon");
+    const player = await upsertUser(client, "idp-player", "player");
+    await registerGame(
+      client,
+      { ownerId: author.id, authorHandle: "kuboon", manifestUrl: MANIFEST_URL },
+      manifest(),
+      GAME_URL,
+    );
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      { via: "rest" },
+    );
+    await retireGame(client, "kuboon/my-puzzle");
+
+    await assertRejects(
+      () =>
+        unlockAchievement(client, player.id, "kuboon/my-puzzle", "no_hints", {
+          via: "rest",
+        }),
+      UnknownAchievementError,
+    );
+  });
+});
+
+Deno.test("restoring puts a withdrawn game back", async () => {
+  await migratedDb(async (client) => {
+    const author = await upsertUser(client, "idp-kuboon", "kuboon");
+    const player = await upsertUser(client, "idp-player", "player");
+    await registerGame(
+      client,
+      { ownerId: author.id, authorHandle: "kuboon", manifestUrl: MANIFEST_URL },
+      manifest(),
+      GAME_URL,
+    );
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      { via: "rest" },
+    );
+    await retireGame(client, "kuboon/my-puzzle");
+    await restoreGame(client, "kuboon/my-puzzle");
+
+    assertEquals((await listGames(client)).map((game) => game.id), [
+      "kuboon/my-puzzle",
+    ]);
+    const result = await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "no_hints",
+      { via: "rest" },
+    );
+    assertEquals(result.created, true);
+  });
+});
+
+Deno.test("counts what removing a game would be weighed against", async () => {
+  await migratedDb(async (client) => {
+    const author = await upsertUser(client, "idp-kuboon", "kuboon");
+    const player = await upsertUser(client, "idp-player", "player");
+    await registerGame(
+      client,
+      { ownerId: author.id, authorHandle: "kuboon", manifestUrl: MANIFEST_URL },
+      manifest(),
+      GAME_URL,
+    );
+    assertEquals(await countUnlocksForGame(client, "kuboon/my-puzzle"), 0);
+
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      { via: "rest" },
+    );
+    assertEquals(await countUnlocksForGame(client, "kuboon/my-puzzle"), 1);
+  });
+});
+
+Deno.test("a withdrawn game keeps its manifest updates, and its withdrawal", async () => {
+  await migratedDb(async (client) => {
+    const author = await upsertUser(client, "idp-kuboon", "kuboon");
+    const player = await upsertUser(client, "idp-player", "player");
+    const registrant = {
+      ownerId: author.id,
+      authorHandle: "kuboon",
+      manifestUrl: MANIFEST_URL,
+    };
+    await registerGame(client, registrant, manifest(), GAME_URL);
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      { via: "rest" },
+    );
+    await retireGame(client, "kuboon/my-puzzle");
+
+    // CI keeps pushing. Registering again must not undo the author's decision
+    // from the dashboard — coming back is a thing they do on purpose.
+    await registerGame(
+      client,
+      registrant,
+      manifest({ title: "My Puzzle 2" }),
+      GAME_URL,
+    );
+
+    const game = await findGame(client, "kuboon/my-puzzle");
+    assertEquals(game?.title, "My Puzzle 2");
+    assertEquals(game?.status, "hidden");
   });
 });

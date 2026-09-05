@@ -69,7 +69,8 @@ export interface UnlockResult {
  * @param key The achievement key, as the manifest declares it
  * @param options How it was reported, and the score if any
  * @returns What changed, and the resulting record
- * @throws {UnknownAchievementError} when the game has no such live achievement
+ * @throws {UnknownAchievementError} when the game has no such live
+ * achievement — retired, or the game itself withdrawn
  */
 export async function unlockAchievement(
   client: Client,
@@ -78,9 +79,15 @@ export async function unlockAchievement(
   key: string,
   { via, score = null }: { via: NewUnlockVia; score?: number | null },
 ): Promise<UnlockResult> {
+  // Live means both halves: the manifest still declares it, and the game is
+  // still in the hub. A withdrawn game stops taking records the moment its
+  // author withdraws it, without any of the old ones moving.
   const found = await client.execute({
-    sql:
-      "select id from achievements where game_id = ? and key = ? and retired = 0",
+    sql: `select achievements.id
+            from achievements
+            join games on games.id = achievements.game_id
+           where achievements.game_id = ? and achievements.key = ?
+             and achievements.retired = 0 and games.status = 'active'`,
     args: [gameId, key],
   });
   const row = found.rows[0];

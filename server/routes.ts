@@ -42,6 +42,8 @@ export const routes = route({
   internalCatalog: get("/api/internal/catalog"),
   internalTimeline: get("/api/internal/timeline"),
   internalGamePeers: get("/api/internal/games/@:handle/:slug/peers"),
+  internalGameRetire: del("/api/internal/games/@:handle/:slug"),
+  internalGameRestore: post("/api/internal/games/@:handle/:slug/restore"),
 
   gameUnlock: post("/api/game/v1/unlock"),
   gameMe: get("/api/game/v1/me"),

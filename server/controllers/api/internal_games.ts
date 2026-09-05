@@ -9,9 +9,17 @@
  */
 
 import type { Action } from "@remix-run/fetch-router";
+import { gameRef } from "@game-center/protocol";
 
 import { requireDb } from "../../db/client.ts";
-import { listAchievements, listGamesOwnedBy } from "../../db/games.ts";
+import {
+  countUnlocksForGame,
+  findGame,
+  listAchievements,
+  listGamesOwnedBy,
+  restoreGame,
+  retireGame,
+} from "../../db/games.ts";
 import {
   findPending,
   listPending,
@@ -37,6 +45,9 @@ export const internalGamesAction = {
     const withAchievements = await Promise.all(games.map(async (game) => ({
       ...game,
       achievements: await listAchievements(client, game.id),
+      // What removing it would mean. Sent with the list so the button can say
+      // which of the two it is before anyone presses it.
+      unlocks: await countUnlocksForGame(client, game.id),
     })));
     const pending = await listPending(client, auth.user.id);
 
@@ -132,3 +143,46 @@ export const internalDismissAction = {
     return apiJson({ dismissed: true });
   },
 } satisfies Action<typeof routes.internalDismiss>;
+
+/**
+ * Only the author, and only from the hub's own dashboard.
+ *
+ * Ownership is read from the row rather than from the URL: `@{handle}/{slug}`
+ * is how the game is named, not proof of who wrote it. A game that is not
+ * this account's answers 404 rather than 403 — whether somebody else's game
+ * exists is not a question this endpoint is for.
+ */
+async function ownGame(
+  context: { params: { handle: string; slug: string } },
+  userId: number,
+) {
+  const gameId = gameRef(context.params.handle, context.params.slug);
+  const game = await findGame(requireDb(), gameId);
+  return game && game.ownerId === userId ? game : null;
+}
+
+export const internalGameRetireAction = {
+  async handler(context) {
+    const auth = await authenticateSession(context);
+    if (!auth.ok) return auth.response;
+
+    const game = await ownGame(context, auth.user.id);
+    if (!game) return apiError("Unknown game", 404);
+
+    const outcome = await retireGame(requireDb(), game.id);
+    return apiJson({ outcome });
+  },
+} satisfies Action<typeof routes.internalGameRetire>;
+
+export const internalGameRestoreAction = {
+  async handler(context) {
+    const auth = await authenticateSession(context);
+    if (!auth.ok) return auth.response;
+
+    const game = await ownGame(context, auth.user.id);
+    if (!game) return apiError("Unknown game", 404);
+
+    await restoreGame(requireDb(), game.id);
+    return apiJson({ status: "active" });
+  },
+} satisfies Action<typeof routes.internalGameRestore>;
