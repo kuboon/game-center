@@ -82,6 +82,7 @@ const sample = (handle: string) =>
   "id": "my-puzzle",
   "author": "${handle}",
   "title": "My Puzzle",
+  "icon": "favicon.svg",
   "url": "https://claude.ai/public/artifacts/…",
   "achievements": [
     { "key": "first_clear", "title": "はじめてのクリア", "points": 10 }
