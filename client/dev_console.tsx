@@ -544,18 +544,47 @@ export const DevConsole = clientEntry(
                             </div>
                           )
                           : (
-                            <button
-                              type="button"
-                              class="link mt-1 text-sm opacity-70"
-                              disabled={busy}
-                              mix={[on("click", () => {
-                                confirming = game.id;
-                                outcome = null;
-                                handle.update();
-                              })]}
-                            >
-                              {game.unlocks > 0 ? "公開停止" : "削除"}
-                            </button>
+                            <div class="mt-1 flex flex-wrap items-center gap-3">
+                              {
+                                /* Only a game the hub can fetch. A pasted one
+                                  has no source to read again — its author
+                                  updates it by pasting.
+
+                                  The page URL rather than `manifestUrl`: the
+                                  hub discovers a manifest by reading the page
+                                  and then looking beside it, so handing it the
+                                  `gamecenter.json` it found last time would be
+                                  a different request from the one that
+                                  registered the game. */
+                              }
+                              {game.manifestUrl
+                                ? (
+                                  <button
+                                    type="button"
+                                    class="link text-sm opacity-70"
+                                    disabled={busy}
+                                    mix={[on(
+                                      "click",
+                                      () => void register({ url: game.url }),
+                                    )]}
+                                  >
+                                    再読み込み
+                                  </button>
+                                )
+                                : null}
+                              <button
+                                type="button"
+                                class="link text-sm opacity-70"
+                                disabled={busy}
+                                mix={[on("click", () => {
+                                  confirming = game.id;
+                                  outcome = null;
+                                  handle.update();
+                                })]}
+                              >
+                                {game.unlocks > 0 ? "公開停止" : "削除"}
+                              </button>
+                            </div>
                           )}
                       </li>
                     ))}
@@ -564,6 +593,8 @@ export const DevConsole = clientEntry(
               <p class="text-sm opacity-70">
                 あなたが作者として登録されているゲームです。 URL
                 登録のものは、その URL からの更新をそのまま受け付けます。
+                「再読み込み」は、その URL
+                をいま読み直してマニフェストを反映します。
               </p>
             </div>
           </div>
