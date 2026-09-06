@@ -32,6 +32,7 @@ type がブラウザの知らない値なので、ゲームの動作には影響
   "author": "${handle}",
   "title": "<ゲームのタイトル>",
   "description": "<一行の説明>",
+  "icon": "favicon.svg",
   "achievements": [
     {
       "key": "first_clear",
@@ -47,6 +48,9 @@ type がブラウザの知らない値なので、ゲームの動作には影響
 - "author" は上の値のまま変えないでください。これが作者の識別子です
 - "id" は作者ごとに一意であればよく、他の人と重複しても構いません
 - "url" は書きません。マニフェストが置かれている場所がゲームの場所です
+- "icon" はカタログとゲームページに出ます。ゲームの URL を基準に解決するので、
+  相対で書きます ("/favicon.svg" と書くと origin の直下を指してしまいます)。
+  単一の HTML しか置けない場合 (Claude Artifacts など) は省いてください
 - 実績は好きなだけ足せます。"hidden": true にすると解除まで内容が伏せられます
 
 ## 2. 実績を解除する
@@ -57,18 +61,20 @@ import { GameCenter } from "https://esm.sh/jsr/@kuboon/game-center-sdk";
 
 const gc = GameCenter.init({ gameId: "${handle}/<id>" });
 
-const result = await gc.unlock("first_clear");
-if (!result.recorded) {
-  // 記録にはプレイヤーの確認が要る。リンクを画面に出す
-  document.body.appendChild(gc.claimLink("first_clear"));
-}
+await gc.unlock("first_clear");
+await gc.unlock("high_score", { score: 1200 });
+
+// 送れなかったぶんは溜まっています。リンク一本で全部まとめて記録できます
+const link = gc.claimLink();
+if (link) container.replaceChildren(link);
 
 外部スクリプトを読み込めない場合 (Claude Artifacts など) は、SDK を使わずに
 次の URL を開くリンクを出すだけでも動きます。
 
-https://ga-cen.kbn.one/claim/@${handle}/<id>/<achievement key>
+https://ga-cen.kbn.one/claim/@${handle}/<id>#gc=first_clear,high_score:1200
 
-スコアを付けるなら ?score=1200 を足します。
+フラグメントに key をカンマで並べ、スコアは : で足します。
+遷移先で一覧を確認してから、まとめて記録されます。
 
 どちらの場合も、**勝手に window.open しないでください。**
 押せるリンクとして出すこと (ポップアップブロック対策と、プレイヤーの意思確認)。
