@@ -40,7 +40,7 @@ Deno.test("a profile card names the person and what they have done", () => {
   assertEquals(meta.type, "profile");
 });
 
-Deno.test("a profile card goes out without a picture rather than a placeholder", () => {
+Deno.test("a profile with no avatar names no picture of its own", () => {
   const meta = profileMeta({ ...author, avatarUrl: null }, {
     games: 0,
     unlocks: 0,
@@ -80,7 +80,10 @@ Deno.test("a game card leaves out an author it does not have", () => {
   assertEquals(meta.description, "実績 1 件 / 0 ポイント。");
 });
 
-Deno.test("a game that supplied no icon gets no picture", () => {
+Deno.test("a game that supplied no icon names no picture of its own", () => {
+  // Nothing is invented to stand in for the icon here. The shell falls back
+  // to the hub's own card, which says game-center rather than pretending to
+  // be this game's picture.
   const meta = gameMeta({ ...game, iconUrl: null }, {
     achievements: 1,
     points: 0,

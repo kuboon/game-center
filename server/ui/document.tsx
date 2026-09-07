@@ -22,7 +22,13 @@ import { Frame, type Handle } from "@remix-run/ui";
 
 import { NavAuth } from "../../client/nav_auth.tsx";
 import { routes } from "../routes.ts";
-import { type PageMeta, pageTitle, SITE_NAME } from "./page_meta.ts";
+import {
+  absoluteUrl,
+  type PageMeta,
+  pageTitle,
+  SITE_NAME,
+} from "./page_meta.ts";
+import { shareCardSize } from "./share_card_image.ts";
 
 type DocumentProps = {
   initialSrc: string;
@@ -37,7 +43,13 @@ export function Document(handle: Handle<DocumentProps>) {
     const { initialSrc, canonical, meta } = handle.props;
     const title = pageTitle(meta);
     const description = meta?.description;
-    const image = meta?.image;
+    // A page's own picture is a game's icon or a player's avatar. Pages that
+    // have neither — the landing page above all, which is the URL anyone
+    // posts about the hub itself — fall back to the card the hub draws for
+    // itself. That is not the placeholder this deliberately does not build:
+    // it says game-center, not "this game has no icon".
+    const own = meta?.image;
+    const image = own ?? absoluteUrl(routes.shareCard.href());
 
     return (
       <html lang="ja">
@@ -62,12 +74,26 @@ export function Document(handle: Handle<DocumentProps>) {
             : null}
           {image ? <meta property="og:image" content={image} /> : null}
           {
-            /* A large card is worth asking for only when there is a picture to
-              put in it; without one it is an empty frame above the text. */
+            /* The hub's own card is drawn at 1.91:1, which is the shape a
+              large card wants. A page's own picture is square — an icon or an
+              avatar — and a large card would crop it to a ribbon. */
           }
+          {own ? null : (
+            <meta
+              property="og:image:width"
+              content={String(shareCardSize.width)}
+            />
+          )}
+          {own ? null : (
+            <meta
+              property="og:image:height"
+              content={String(shareCardSize.height)}
+            />
+          )}
+          {own ? null : <meta property="og:image:alt" content={SITE_NAME} />}
           <meta
             name="twitter:card"
-            content={image ? "summary_large_image" : "summary"}
+            content={own ? "summary" : "summary_large_image"}
           />
 
           {

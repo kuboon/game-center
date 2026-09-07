@@ -333,6 +333,25 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   カタログだけが並ぶ
 - 筐体は SSR とCSS だけで出る。JS を切ってもカタログは読める
 
+## 共有カード
+
+`og:image` は**ハブ自身のカード一枚**(`GET /og.png`)。ページごとには生成しない。
+
+- ページ自身の絵はゲームのアイコンとプレイヤーのアバターだけ。持たないページは
+  ハブのカードに落ちる。**アイコンの代役ではなく**「これは game-center の
+  ページだ」と言う絵なので、中身のない placeholder を置くのとは別のことである
+- **コードで描く**(`server/ui/share_card_image.ts`)。クローラは SVG を描画
+  しないのでラスタが要る。矩形だけで描き `server/ui/png.ts` が PNG にする(zlib
+  ストリームは `CompressionStream("deflate")` がそのまま出す)。差分の読めない
+  バイナリをリポジトリに置かずに済む
+- ファイルではなくルートなのは `/schema/gamecenter.json` と同じ理由
+- **ページ固有の文字は載せない**。ここの文章は日本語で、描くには CJK フォントを
+  積むことになる。題名は `og:title` として絵の隣に文字で出ている。載るのは筐体と
+  名前と、`RP_ORIGIN` から取ったホスト名だけ
+- `twitter:card` はページ自身の絵があるときだけ `summary`。アイコンもアバターも
+  正方形で、大きいカードは帯に切る。1.91:1 のハブのカードのときだけ
+  `summary_large_image`
+
 ## PWA / 通知
 
 `server/controllers/pwa.ts` が manifest・アイコン・service worker を配る。

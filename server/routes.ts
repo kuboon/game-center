@@ -22,6 +22,7 @@ export const routes = route({
   schema: get("/schema/gamecenter.json"),
   webManifest: get("/manifest.webmanifest"),
   appIcon: get("/icons/icon.svg"),
+  shareCard: get("/og.png"),
   serviceWorker: get("/sw.js"),
   jwks: get("/.well-known/jwks.json"),
 
