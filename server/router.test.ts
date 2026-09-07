@@ -360,12 +360,35 @@ Deno.test("the catalog tells a crawler what game-center is", async () => {
   assertStringIncludes(html, 'content="https://ga-cen.kbn.one/"');
 });
 
-Deno.test("asks for a small card when there is no picture", async () => {
-  // A large card with nothing in it is worse than a small one that fits.
+Deno.test("a page with no picture of its own carries the hub's card", async () => {
+  // The landing page is the URL people post about game-center itself, so the
+  // picture on it is the hub's own — drawn at the shape a large card wants.
   const response = await router.fetch(new Request("http://localhost/"));
   const html = await response.text();
-  assertStringIncludes(html, 'name="twitter:card" content="summary"');
-  assertEquals(html.includes('property="og:image"'), false);
+  assertStringIncludes(
+    html,
+    'property="og:image" content="https://ga-cen.kbn.one/og.png"',
+  );
+  assertStringIncludes(html, 'property="og:image:width" content="1200"');
+  assertStringIncludes(html, 'property="og:image:height" content="630"');
+  assertStringIncludes(
+    html,
+    'name="twitter:card" content="summary_large_image"',
+  );
+});
+
+Deno.test("the hub draws its own card rather than storing one", async () => {
+  const response = await router.fetch(new Request("http://localhost/og.png"));
+  assertEquals(response.status, 200);
+  assertEquals(response.headers.get("content-type"), "image/png");
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  // Crawlers do not render SVG, which is why this one route is a raster.
+  assertEquals(Array.from(bytes.slice(0, 4)), [137, 80, 78, 71]);
+  // Width and height live in IHDR, big-endian, right after the signature.
+  const header = new DataView(bytes.buffer, 16, 8);
+  assertEquals(header.getUint32(0), 1200);
+  assertEquals(header.getUint32(4), 630);
 });
 
 Deno.test("a page nobody shares still says which page it is", async () => {

@@ -19,11 +19,13 @@ export interface PageMeta {
   /** One or two sentences under the headline. */
   readonly description?: string;
   /**
-   * Absolute URL of the card's image.
+   * Absolute URL of the card's *own* image.
    *
-   * Never generated. A game supplies its own icon through its manifest and a
-   * player may have an avatar at the IdP; when neither exists the card goes
-   * out without a picture, which is a better card than one with a placeholder.
+   * Never generated per page: a game supplies its icon through its manifest
+   * and a player may have an avatar at the IdP. A page that has neither is
+   * left without one here and falls back, in {@link Document}, to the card
+   * the hub draws for itself — which says game-center rather than standing in
+   * for the picture this page does not have.
    */
   readonly image?: string;
   /** Open Graph's own vocabulary. Profiles are people, everything else is not. */
