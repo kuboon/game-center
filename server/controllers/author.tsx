@@ -20,6 +20,7 @@ import type { Action } from "@remix-run/fetch-router";
 import { parseGameRef } from "@game-center/protocol";
 
 import { FollowButton } from "../../client/follow_button.tsx";
+import { ShareRow } from "../../client/share_row.tsx";
 import { getDb } from "../db/client.ts";
 import { countFollows } from "../db/follows.ts";
 import { listGamesOwnedBy } from "../db/games.ts";
@@ -73,12 +74,19 @@ export const authorPageAction = {
             <h1 class="text-3xl font-bold">{author.displayName}</h1>
             <p class="opacity-70">@{author.handle}</p>
           </div>
-          <FollowButton
-            handle={author.handle}
-            displayName={author.displayName}
-            followers={follows.followers}
-            followees={follows.followees}
-          />
+          {
+            /* The two things a reader can do with somebody else's page: keep
+              up with them, or hand the page to someone who would. */
+          }
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <FollowButton
+              handle={author.handle}
+              displayName={author.displayName}
+              followers={follows.followers}
+              followees={follows.followees}
+            />
+            <ShareRow />
+          </div>
           {
             /* The cabinet's score panel, moved to where the score belongs.
               On the landing page it could only ever show the visitor their

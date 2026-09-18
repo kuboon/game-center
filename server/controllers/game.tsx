@@ -9,8 +9,10 @@
 
 import type { Action } from "@remix-run/fetch-router";
 
+import { FollowButton } from "../../client/follow_button.tsx";
 import { PeerScores } from "../../client/peer_scores.tsx";
 import { PlayButton } from "../../client/play_button.tsx";
+import { ShareRow } from "../../client/share_row.tsx";
 import { getDb } from "../db/client.ts";
 import { gameRef } from "@game-center/protocol";
 
@@ -69,19 +71,36 @@ export const gamePageAction = {
             }
             {author
               ? (
-                <p class="text-sm opacity-70">
-                  作者 {author.handle
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p class="text-sm opacity-70">
+                    作者 {author.handle
+                      ? (
+                        <a
+                          class="link"
+                          href={routes.author.href({ handle: author.handle })}
+                          data-rmx-target="content"
+                        >
+                          {author.displayName}
+                        </a>
+                      )
+                      : author.displayName}
+                  </p>
+                  {
+                    /* Following starts here more often than on the profile:
+                      somebody who just found a game they like is one press
+                      away from the next one its author makes. The counts and
+                      the pitch stay on the profile — see `compact`. */
+                  }
+                  {author.handle
                     ? (
-                      <a
-                        class="link"
-                        href={routes.author.href({ handle: author.handle })}
-                        data-rmx-target="content"
-                      >
-                        {author.displayName}
-                      </a>
+                      <FollowButton
+                        handle={author.handle}
+                        displayName={author.displayName}
+                        compact
+                      />
                     )
-                    : author.displayName}
-                </p>
+                    : null}
+                </div>
               )
               : null}
             {game.description ? <p>{game.description}</p> : null}
@@ -89,7 +108,11 @@ export const gamePageAction = {
           </div>
         </div>
 
-        <PlayButton gameId={game.id} gameUrl={game.url} />
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <PlayButton gameId={game.id} gameUrl={game.url} />
+          {/* The other thing to do with a game you like: hand it to someone. */}
+          <ShareRow />
+        </div>
 
         <div class="card card-border bg-base-100">
           <div class="card-body">

@@ -39,9 +39,23 @@ export interface FollowButtonProps {
   handle: string;
   /** Their display name, for the line confirming the follow. */
   displayName: string;
-  /** Counts as the server rendered them, so the first paint is already right. */
-  followers: number;
-  followees: number;
+  /**
+   * Counts as the server rendered them, so the first paint is already right.
+   *
+   * Left out where the counts are not shown — see {@link compact}.
+   */
+  followers?: number;
+  followees?: number;
+  /**
+   * The button alone: no counts, and nothing explaining what a follow is for.
+   *
+   * That case is made on the profile, which is the page an author posts and
+   * the page a reader arrives on to decide. A game page is somebody who came
+   * to play; the button is there so that liking the game is one press away
+   * from following whoever made it, and anything more is in the way of the
+   * game.
+   */
+  compact?: boolean;
   [key: string]: SerializableValue;
 }
 
@@ -141,8 +155,9 @@ export const FollowButton = clientEntry(
     };
 
     return () => {
-      const followers = state?.followers ?? handle.props.followers;
-      const followees = state?.followees ?? handle.props.followees;
+      const compact = handle.props.compact === true;
+      const followers = state?.followers ?? handle.props.followers ?? 0;
+      const followees = state?.followees ?? handle.props.followees ?? 0;
       // Bound rather than tested inline so the null check narrows `state`.
       const active = session.ready && sessionStore.userId && state &&
           !state.self
@@ -182,9 +197,11 @@ export const FollowButton = clientEntry(
                 </button>
               )
               : null}
-            <span class="text-sm opacity-70">
-              フォロワー {followers} / フォロー中 {followees}
-            </span>
+            {compact ? null : (
+              <span class="text-sm opacity-70">
+                フォロワー {followers} / フォロー中 {followees}
+              </span>
+            )}
           </span>
 
           {announced
@@ -194,7 +211,7 @@ export const FollowButton = clientEntry(
               </p>
             )
             : null}
-          {invited
+          {invited && !compact
             ? (
               <p class="text-sm opacity-70">
                 game-center
