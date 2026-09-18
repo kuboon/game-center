@@ -359,8 +359,10 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 共有ボタンは `client/share_row.tsx`(`@kuboon/share-element` の
 `<share-buttons>`)。`/@{handle}` と `/@{handle}/{slug}` に置く。
 
-- **タグで書かずスクリプトで作る**。日本語のラベルは属性ではなくプロパティで、
-  マークアップからは触れない
+- **タグ一つで済ませる**(`@kuboon/share-element@0.6`)。ボタンの名前はページの
+  `lang` から、色は `currentColor` から取る。シェルが `<html lang="ja">` を
+  出しているので、こちらで指定するものは何も無い。0.6 より前は両方を書き出す
+  必要があり、それがこのファイルの中身だった
 - **`data-rmx-preserve-dom` を付ける**。ボタンはカスタム要素自身の子なので、
   フレーム再読み込みで reconciler が空の vtree と突き合わせると消える。要素は
   document から出ていないので作り直されない

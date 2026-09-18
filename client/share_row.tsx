@@ -2,16 +2,18 @@
  * ShareRow — the share buttons, as a `clientEntry`.
  *
  * The pages people are meant to post somewhere are the profile and the game
- * page, and until now posting one meant copying the address bar. This is the
- * row of buttons that does it: X, LINE, Threads, and either the platform's
- * own share sheet or a copy-to-clipboard button, from
- * `@kuboon/share-element`.
+ * page, and posting one used to mean copying the address bar. This is the row
+ * of buttons that does it: X, LINE, Threads, and either the platform's own
+ * share sheet or a copy-to-clipboard button, from `@kuboon/share-element`.
  *
- * **The row is built from script rather than written as a tag** so the
- * Japanese labels can be set on it. They are the tooltip and the accessible
- * name of each icon-only button, and they are a property on the element, not
- * an attribute — a page that only writes `<share-buttons>` in its markup
- * cannot reach them.
+ * It is one tag. The names on the buttons come from the page's language — the
+ * shell says `<html lang="ja">` — and their colour from `currentColor`, so
+ * there is nothing here to set and nothing to keep in step with the theme.
+ * (`@kuboon/share-element@0.6`: before it, both had to be written out, which
+ * is what this file used to be.)
+ *
+ * It stays a `clientEntry` because that is how a page here asks for browser
+ * code: the marker is what fetches the module that defines the element.
  *
  * `data-rmx-preserve-dom` keeps the reconciler out of the subtree. The buttons
  * are the element's own children, not this component's, and a frame reload
@@ -23,37 +25,23 @@
  * shares the page the reader is actually looking at.
  */
 
-import { clientEntry, ref } from "@remix-run/ui";
+import { clientEntry } from "@remix-run/ui";
 
-import { createShareButtons } from "@kuboon/share-element";
+// Registers `<share-buttons>` where there is a DOM, and does nothing on the
+// server, so this import is safe in a module the SSR render also evaluates.
+import "@kuboon/share-element";
 
-/**
- * What each button is called, in Japanese.
- *
- * Only the ones that are words: X, LINE and Threads are names, and a name is
- * the same in every language.
- */
-const LABELS = {
-  share: "共有",
-  copy: "URL をコピー",
-  copied: "コピーしました",
-  copyFailed: "コピーできませんでした",
-};
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      /** Only what this file writes. The element's own API is `url` / `show` / `labels`. */
+      "share-buttons": {
+        "data-rmx-preserve-dom"?: boolean;
+      };
+    }
+  }
+}
 
-export const ShareRow = clientEntry(
-  "/share_row.js#ShareRow",
-  function ShareRow() {
-    const mount = (node: Element) => {
-      // Hydration and every later insert land here. A preserved subtree already
-      // holds its row, and appending a second one would be two of everything.
-      if (node.firstElementChild) return;
-      const row = createShareButtons();
-      row.labels = LABELS;
-      node.append(row);
-    };
-
-    return () => (
-      <div class="flex items-center" data-rmx-preserve-dom mix={[ref(mount)]} />
-    );
-  },
-);
+export const ShareRow = clientEntry("/share_row.js#ShareRow", function () {
+  return () => <share-buttons data-rmx-preserve-dom />;
+});
