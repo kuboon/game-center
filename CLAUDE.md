@@ -213,6 +213,10 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - ただし `hidden` の実績は他人に題名を見せない(`server/lib/spoilers.ts`)。
   プロフィールは公開ページなので、ここが漏れると全ゲームの秘密が漏れる
 - フォローボタンだけ clientEntry。誰がフォローしているかは SSR では分からない
+- **ゲームページの作者行にも同じボタンを置く**(`compact`)。フォローが始まるのは
+  たいていここで、遊んで気に入った直後がいちばん近い。ただし出すのはボタンだけ —
+  数と「なぜフォローするのか」はプロフィールに置く。ゲームページに来た人は
+  遊びに来ている
 - **`/@{handle}` に来るサインアウトの訪問者が本命**。作者が SNS に貼った URL を
   踏んだ人であり、ここでサインアップしてもらう。「サインインしてフォロー」を出し、
   戻ってきたら自動でフォローする
@@ -351,6 +355,20 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - `twitter:card` はページ自身の絵があるときだけ `summary`。アイコンもアバターも
   正方形で、大きいカードは帯に切る。1.91:1 のハブのカードのときだけ
   `summary_large_image`
+
+共有ボタンは `client/share_row.tsx`(`@kuboon/share-element` の
+`<share-buttons>`)。`/@{handle}` と `/@{handle}/{slug}` に置く。
+
+- **タグで書かずスクリプトで作る**。日本語のラベルは属性ではなくプロパティで、
+  マークアップからは触れない
+- **`data-rmx-preserve-dom` を付ける**。ボタンはカスタム要素自身の子なので、
+  フレーム再読み込みで reconciler が空の vtree と突き合わせると消える。要素は
+  document から出ていないので作り直されない
+- URL は渡さない。要素がクリックの瞬間に `location.href` を読むので、フレーム
+  遷移しても読者が見ているページを共有する
+- clientEntry を足したら `bundler/js.ts` の `CLIENT_ENTRIES` にも足す。忘れると
+  マーカーだけが 404 を名指し、型検査もビルドも通ったまま部品が動かない。
+  `tests/client_entries.test.ts` が見張っている
 
 ## PWA / 通知
 
