@@ -23,7 +23,6 @@ function prompt(handle: string): string {
 ## 1. マニフェストをページに埋め込む
 
 ゲームの HTML の <head> に、次の script をそのまま足します。
-type がブラウザの知らない値なので、ゲームの動作には影響しません。
 
 <script type="application/gamecenter+json">
 {
@@ -47,7 +46,6 @@ type がブラウザの知らない値なので、ゲームの動作には影響
 
 - "author" は上の値のまま変えないでください。これが作者の識別子です
 - "id" は作者ごとに一意であればよく、他の人と重複しても構いません
-- "url" は書きません。マニフェストが置かれている場所がゲームの場所です
 - "icon" はカタログとゲームページに出ます。ゲームの URL を基準に解決するので、
   相対で書きます ("/favicon.svg" と書くと origin の直下を指してしまいます)。
   単一の HTML しか置けない場合 (Claude Artifacts など) は省いてください
@@ -81,8 +79,30 @@ https://ga-cen.kbn.one/claim/@${handle}/<id>#gc=first_clear,high_score:1200
 
 ## 3. 登録
 
-ゲームを公開したら、その URL を私に教えてください。
-ハブに登録します。CI から自動登録することもできます。`;
+ゲームを公開したら、その URL を私に教えてください。ハブに登録します。
+
+CI から登録するなら、GitHub Actions は次の一段だけです (secret も checkout も
+不要。ハブがその URL を読みに行きます)。
+
+# .github/workflows/register.yaml
+on:
+  push: { branches: [main] }
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: kuboon/game-center/action@v1
+        with:
+          url: <公開したゲームのページ URL>
+
+他の CI なら同じことを curl でやります。
+
+curl -X POST https://ga-cen.kbn.one/api/registry/v1/games \\
+  -H 'content-type: application/json' \\
+  -d '{"url":"<公開したゲームのページ URL>"}'
+
+初回は 202 (承認待ち) が返り、作者が https://ga-cen.kbn.one/dev で一度だけ
+承認します。以後その URL からの push はそのまま通ります (200)。`;
 }
 
 export const PromptCard = clientEntry(
