@@ -18,7 +18,7 @@ import { mountSession, sessionStore } from "./session.ts";
 
 /** The instruction, with the player's own handle already in it. */
 function prompt(handle: string): string {
-  return `このゲームを game-center (https://ga-cen.kbn.one) に対応させてください。
+  return `このゲームを GameCenter (https://ga-cen.kbn.one) に対応させてください。
 
 ## 1. マニフェストをページに埋め込む
 
@@ -53,7 +53,7 @@ function prompt(handle: string): string {
 
 ## 2. 実績を解除する
 
-SDK を使う場合 (推奨。ハブ経由で起動されたときは自動で即時記録になります):
+SDK を使う場合 (推奨。GameCenter 経由で起動されたときは自動で即時記録になります):
 
 import { GameCenter } from "https://esm.sh/jsr/@kuboon/game-center-sdk";
 
@@ -81,10 +81,10 @@ https://ga-cen.kbn.one/claim/@${handle}/<id>#gc=first_clear,high_score:1200
 
 公開したあとに一度だけ必要です。公開先で二通りに分かれます。
 
-### ハブが URL を読める場合 (GitHub Pages など)
+### GameCenter が URL を読める場合 (GitHub Pages など)
 
-CI があるなら次を置きます (secret も checkout も不要。ハブが URL を読みに
-行きます)。
+CI があるなら次を置きます (secret も checkout も不要。GameCenter が
+その URL を読みに行きます)。
 
 # .github/workflows/register.yaml
 on:
@@ -107,7 +107,7 @@ curl -X POST https://ga-cen.kbn.one/api/registry/v1/games \\
 「https://ga-cen.kbn.one/dev で承認してください」と伝えてください。
 承認は最初の一度だけで、以後その URL からの push は素通しです (200)。
 
-### ハブが読めない場合 (Claude Artifacts など)
+### GameCenter が読めない場合 (Claude Artifacts など)
 
 上のマニフェストに "url": "<公開 URL>" を足したものを作者に渡し、
 https://ga-cen.kbn.one/dev の「貼り付けて登録」に貼ってもらってください。`;
