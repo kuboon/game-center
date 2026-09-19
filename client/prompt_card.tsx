@@ -18,12 +18,11 @@ import { mountSession, sessionStore } from "./session.ts";
 
 /** The instruction, with the player's own handle already in it. */
 function prompt(handle: string): string {
-  return `このゲームを game-center (https://ga-cen.kbn.one) に対応させてください。
+  return `このゲームを GameCenter (https://ga-cen.kbn.one) に対応させてください。
 
 ## 1. マニフェストをページに埋め込む
 
 ゲームの HTML の <head> に、次の script をそのまま足します。
-type がブラウザの知らない値なので、ゲームの動作には影響しません。
 
 <script type="application/gamecenter+json">
 {
@@ -47,7 +46,6 @@ type がブラウザの知らない値なので、ゲームの動作には影響
 
 - "author" は上の値のまま変えないでください。これが作者の識別子です
 - "id" は作者ごとに一意であればよく、他の人と重複しても構いません
-- "url" は書きません。マニフェストが置かれている場所がゲームの場所です
 - "icon" はカタログとゲームページに出ます。ゲームの URL を基準に解決するので、
   相対で書きます ("/favicon.svg" と書くと origin の直下を指してしまいます)。
   単一の HTML しか置けない場合 (Claude Artifacts など) は省いてください
@@ -55,7 +53,7 @@ type がブラウザの知らない値なので、ゲームの動作には影響
 
 ## 2. 実績を解除する
 
-SDK を使う場合 (推奨。ハブ経由で起動されたときは自動で即時記録になります):
+SDK を使う場合 (推奨。GameCenter 経由で起動されたときは自動で即時記録になります):
 
 import { GameCenter } from "https://esm.sh/jsr/@kuboon/game-center-sdk";
 
@@ -81,8 +79,38 @@ https://ga-cen.kbn.one/claim/@${handle}/<id>#gc=first_clear,high_score:1200
 
 ## 3. 登録
 
-ゲームを公開したら、その URL を私に教えてください。
-ハブに登録します。CI から自動登録することもできます。`;
+公開したあとに一度だけ必要です。公開先で二通りに分かれます。
+
+### GameCenter が URL を読める場合 (GitHub Pages など)
+
+CI があるなら次を置きます (secret も checkout も不要。GameCenter が
+その URL を読みに行きます)。
+
+# .github/workflows/register.yaml
+on:
+  push: { branches: [main] }
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: kuboon/game-center/action@v1
+        with:
+          url: <公開したゲームのページ URL>
+
+CI が無ければ同じことを curl で一度だけ実行します。
+
+curl -X POST https://ga-cen.kbn.one/api/registry/v1/games \\
+  -H 'content-type: application/json' \\
+  -d '{"url":"<公開したゲームのページ URL>"}'
+
+初回は 202 (承認待ち) が返ります。そうしたら作者に
+「https://ga-cen.kbn.one/dev で承認してください」と伝えてください。
+承認は最初の一度だけで、以後その URL からの push は素通しです (200)。
+
+### GameCenter が読めない場合 (Claude Artifacts など)
+
+上のマニフェストに "url": "<公開 URL>" を足したものを作者に渡し、
+https://ga-cen.kbn.one/dev の「貼り付けて登録」に貼ってもらってください。`;
 }
 
 export const PromptCard = clientEntry(
