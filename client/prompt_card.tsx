@@ -79,10 +79,12 @@ https://ga-cen.kbn.one/claim/@${handle}/<id>#gc=first_clear,high_score:1200
 
 ## 3. 登録
 
-ゲームを公開したら、その URL を私に教えてください。ハブに登録します。
+公開したあとに一度だけ必要です。公開先で二通りに分かれます。
 
-CI から登録するなら、GitHub Actions は次の一段だけです (secret も checkout も
-不要。ハブがその URL を読みに行きます)。
+### ハブが URL を読める場合 (GitHub Pages など)
+
+CI があるなら次を置きます (secret も checkout も不要。ハブが URL を読みに
+行きます)。
 
 # .github/workflows/register.yaml
 on:
@@ -95,14 +97,20 @@ jobs:
         with:
           url: <公開したゲームのページ URL>
 
-他の CI なら同じことを curl でやります。
+CI が無ければ同じことを curl で一度だけ実行します。
 
 curl -X POST https://ga-cen.kbn.one/api/registry/v1/games \\
   -H 'content-type: application/json' \\
   -d '{"url":"<公開したゲームのページ URL>"}'
 
-初回は 202 (承認待ち) が返り、作者が https://ga-cen.kbn.one/dev で一度だけ
-承認します。以後その URL からの push はそのまま通ります (200)。`;
+初回は 202 (承認待ち) が返ります。そうしたら作者に
+「https://ga-cen.kbn.one/dev で承認してください」と伝えてください。
+承認は最初の一度だけで、以後その URL からの push は素通しです (200)。
+
+### ハブが読めない場合 (Claude Artifacts など)
+
+上のマニフェストに "url": "<公開 URL>" を足したものを作者に渡し、
+https://ga-cen.kbn.one/dev の「貼り付けて登録」に貼ってもらってください。`;
 }
 
 export const PromptCard = clientEntry(
