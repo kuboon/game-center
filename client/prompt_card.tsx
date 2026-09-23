@@ -62,7 +62,8 @@ const gc = GameCenter.init({ gameId: "${handle}/<id>" });
 await gc.unlock("first_clear");
 await gc.unlock("high_score", { score: 1200 });
 
-// 送れなかったぶんは溜まっています。リンク一本で全部まとめて記録できます
+// unlock() は例外を投げず、送れなければ localStorage に溜めます
+// (返り値は { recorded, pending })。claimLink() は溜まっていなければ null
 const link = gc.claimLink();
 if (link) container.replaceChildren(link);
 
