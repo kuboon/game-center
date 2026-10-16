@@ -1,0 +1,52 @@
+# Point `kuboon/game-center/action@v1` at the current main.
+#
+# The action lives in this repository but is used from other people's
+# workflows, so what they reference is a tag, not a branch: `@main` would hand
+# every game's CI whatever landed a minute ago. `v1` is the moving major tag
+# GitHub's own actions use — it is the promise that the interface has not
+# changed, and this workflow is what keeps it on the newest commit that kept
+# that promise. Breaking the inputs or outputs means cutting `v2` by hand, not
+# touching this file.
+#
+# It runs on pushes that touch `action/`, so the tag cannot drift behind the
+# directory it names, and by hand (`workflow_dispatch`) for the first tag and
+# for a move after a revert.
+name: release action
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - action/**
+      - .github/workflows/release-action.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      # No checkout: moving a tag is one ref write, and the REST API does it
+      # without a working tree or a credential helper that has to be told to
+      # keep the token.
+      - name: Move v1 to this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # PATCH updates the ref and POST creates it; which one applies is
+          # decided by asking, so a failure to move cannot be mistaken for a
+          # tag that was not there yet.
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1" >/dev/null 2>&1
+          then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v1" \
+              -f sha="$GITHUB_SHA" -F force=true
+            echo "::notice::v1 -> $GITHUB_SHA"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref=refs/tags/v1 -f sha="$GITHUB_SHA"
+            echo "::notice::v1 created at $GITHUB_SHA"
+          fi
