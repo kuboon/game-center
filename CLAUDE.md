@@ -26,7 +26,9 @@ Deno workspace。
   `bundled/`(git 管理外)
 - `assets/style.css` — Tailwind v4 + daisyUI の入力 CSS
 - `packages/sdk` — ゲームに同梱する SDK。単一ファイル、依存ゼロ
-- `action/` — ゲーム登録用の composite action。secret を取らない
+- `action/` — ゲーム登録用の composite action。secret を取らない。利用側が指す
+  `v1` は可動タグで、`.github/workflows/release-action.yaml` が `action/`
+  を触った push で付け替える
 - `skills/game-center/SKILL.md` — ゲームを作る LLM 向けの skill
 - `tests/` — FFI 権限が要るテスト(ローカル SQLite
   に対するマイグレーション検証)。詳細は [tests/README.md](tests/README.md)
