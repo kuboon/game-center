@@ -2,21 +2,24 @@
  * GET /@{author}/{slug} — one game, its achievements, and the way in.
  *
  * The achievement list is server-rendered from the manifest, so it reads the
- * same for a visitor as for a signed-in player. Hidden achievements are shown
- * as locked without their wording: which ones exist is public, what they are
- * is not.
+ * same for a visitor, a crawler, and a browser without JavaScript. A signed-in
+ * player's own state — marks, scores, progress, the people they follow — is
+ * laid over that same list by `AchievementBoard` once the session answers.
+ *
+ * Hidden achievements go out without their wording, in the markup and in the
+ * component's props alike: which ones exist is public, what they are is not.
  */
 
 import type { Action } from "@remix-run/fetch-router";
 
+import { AchievementBoard } from "../../client/achievement_board.tsx";
 import { FollowButton } from "../../client/follow_button.tsx";
-import { PeerScores } from "../../client/peer_scores.tsx";
 import { PlayButton } from "../../client/play_button.tsx";
 import { ShareRow } from "../../client/share_row.tsx";
 import { getDb } from "../db/client.ts";
 import { gameRef } from "@game-center/protocol";
 
-import { type Achievement, findGame, listAchievements } from "../db/games.ts";
+import { findGame, listAchievements } from "../db/games.ts";
 import { findUserByHandle } from "../db/users.ts";
 import { routes } from "../routes.ts";
 import { gameMeta } from "../ui/share_cards.ts";
@@ -114,22 +117,17 @@ export const gamePageAction = {
           <ShareRow />
         </div>
 
-        <div class="card card-border bg-base-100">
-          <div class="card-body">
-            <h2 class="card-title">
-              実績 {achievements.length} 件 / {points} ポイント
-            </h2>
-            {achievements.length === 0
-              ? <p>このゲームはまだ実績を定義していません。</p>
-              : (
-                <ul class="space-y-3">
-                  {achievements.map(achievementRow)}
-                </ul>
-              )}
-          </div>
-        </div>
-
-        <PeerScores handle={handle} slug={slug} />
+        <AchievementBoard
+          handle={handle}
+          slug={slug}
+          achievements={achievements.map((achievement) => ({
+            key: achievement.key,
+            title: achievement.hidden ? null : achievement.title,
+            description: achievement.hidden ? null : achievement.description,
+            points: achievement.points,
+            hidden: achievement.hidden,
+          }))}
+        />
       </main>,
       gameMeta(
         game,
@@ -139,23 +137,3 @@ export const gamePageAction = {
     );
   },
 } satisfies Action<typeof routes.game>;
-
-/** One row of the achievement list. See `gameCard` on why it is not a component. */
-function achievementRow(achievement: Achievement) {
-  return (
-    <li key={achievement.key} class="border-base-300 border-t pt-3">
-      <div class="flex items-baseline gap-2">
-        <span class="font-bold">
-          {achievement.hidden ? "??????" : achievement.title}
-        </span>
-        <span class="badge badge-ghost badge-sm">{achievement.points} pt</span>
-        {achievement.hidden
-          ? <span class="badge badge-outline badge-sm">隠し実績</span>
-          : null}
-      </div>
-      {!achievement.hidden && achievement.description
-        ? <p class="text-sm opacity-70">{achievement.description}</p>
-        : null}
-    </li>
-  );
-}

@@ -42,7 +42,7 @@ export const routes = route({
   internalFollowersSeen: post("/api/internal/followers/seen"),
   internalCatalog: get("/api/internal/catalog"),
   internalTimeline: get("/api/internal/timeline"),
-  internalGamePeers: get("/api/internal/games/@:handle/:slug/peers"),
+  internalGameProgress: get("/api/internal/games/@:handle/:slug/progress"),
   internalGameRetire: del("/api/internal/games/@:handle/:slug"),
   internalGameRestore: post("/api/internal/games/@:handle/:slug/restore"),
 

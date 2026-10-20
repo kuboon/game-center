@@ -34,7 +34,7 @@ import {
   internalFollowStateAction,
   internalUnfollowAction,
 } from "./controllers/api/internal_follows.ts";
-import { internalGamePeersAction } from "./controllers/api/internal_game_peers.ts";
+import { internalGameProgressAction } from "./controllers/api/internal_game_progress.ts";
 import { internalMeAchievementsAction } from "./controllers/api/internal_me.ts";
 import {
   internalClaimAction,
@@ -121,7 +121,7 @@ router.get(routes.internalCatalog, internalCatalogAction);
 router.get(routes.internalFollowers, internalFollowersAction);
 router.post(routes.internalFollowersSeen, internalFollowersSeenAction);
 router.get(routes.internalTimeline, internalTimelineAction);
-router.get(routes.internalGamePeers, internalGamePeersAction);
+router.get(routes.internalGameProgress, internalGameProgressAction);
 router.delete(routes.internalGameRetire, internalGameRetireAction);
 router.post(routes.internalGameRestore, internalGameRestoreAction);
 

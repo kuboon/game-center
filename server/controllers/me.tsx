@@ -4,10 +4,16 @@
  * First, who followed you — the one thing here that happened *to* the player
  * rather than because of them, and so the one thing they would never think to
  * go and check. Then a timeline: what the people you follow have unlocked and
- * registered,
- * newest first, every row one click from the game. Your own record is the
- * second thing here, because you already know what you did — and the page that
- * shows it to other people is `/@{handle}`, not this one.
+ * registered, newest first, every row one click from the game.
+ *
+ * Your own record comes after, summed up per game, because you already know
+ * what you did. Each game links to its page, which is where single
+ * achievements are read; the page that shows your record to other people is
+ * `/@{handle}`, and the record links there too.
+ *
+ * Installing, notifications and the account sit folded at the bottom. They are
+ * set up once and then left alone, and every visit after that would otherwise
+ * scroll past three cards to reach nothing.
  *
  * Registering a game is not here. That belongs on `/dev` with the rest of the
  * developer path; a player who never publishes anything should not have to
@@ -21,9 +27,9 @@
 import type { Action } from "@remix-run/fetch-router";
 
 import { AccountCard } from "../../client/account_card.tsx";
-import { AchievementList } from "../../client/achievement_list.tsx";
 import { Followers } from "../../client/followers.tsx";
 import { InstallCard } from "../../client/install_card.tsx";
+import { MyRecord } from "../../client/my_record.tsx";
 import { NotifyCard } from "../../client/notify_card.tsx";
 import { Timeline } from "../../client/timeline.tsx";
 import { routes } from "../routes.ts";
@@ -46,18 +52,24 @@ export const meAction = {
           <Timeline />
         </section>
 
-        <div class="card card-border bg-base-100">
-          <div class="card-body">
-            <h2 class="card-title">自分の実績</h2>
-            <AchievementList />
+        <section class="space-y-3">
+          <h2 class="text-xl font-bold">自分の記録</h2>
+          <MyRecord />
+        </section>
+
+        <details class="collapse-arrow border-base-300 collapse border">
+          <summary class="collapse-title font-bold">
+            設定
+            <span class="ml-2 text-sm font-normal opacity-70">
+              ホーム画面に追加・通知・アカウント
+            </span>
+          </summary>
+          <div class="collapse-content space-y-4">
+            <InstallCard />
+            <NotifyCard />
+            <AccountCard returnTo="/me" />
           </div>
-        </div>
-
-        <InstallCard />
-
-        <NotifyCard />
-
-        <AccountCard returnTo="/me" />
+        </details>
 
         <p class="text-sm opacity-70">
           ゲームを登録するには{" "}

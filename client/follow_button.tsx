@@ -211,6 +211,22 @@ export const FollowButton = clientEntry(
               </p>
             )
             : null}
+          {
+            /* Your own profile, reached from the link on /me: say whose view
+              this is, so the masked titles read as a choice rather than a
+              fault. */
+          }
+          {session.ready && state?.self && !compact
+            ? (
+              <p class="text-sm opacity-70">
+                あなたの公開プロフィールです。ほかの人にはこう見えます
+                (隠し実績の題名は伏せています)。{" "}
+                <a class="link" href="/me" data-rmx-target="content">
+                  マイページへ
+                </a>
+              </p>
+            )
+            : null}
           {invited && !compact
             ? (
               <p class="text-sm opacity-70">

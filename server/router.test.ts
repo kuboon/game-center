@@ -339,9 +339,9 @@ Deno.test("the personal part of the catalog needs a session", async () => {
   assertEquals(response.status, 401);
 });
 
-Deno.test("comparing records with the people you follow needs a session", async () => {
+Deno.test("your progress in a game needs a session", async () => {
   const response = await router.fetch(
-    new Request("http://localhost/api/internal/games/@kuboon/puzzle/peers"),
+    new Request("http://localhost/api/internal/games/@kuboon/puzzle/progress"),
   );
   assertEquals(response.status, 401);
   assertEquals(response.headers.get("cache-control"), "no-store");

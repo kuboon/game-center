@@ -103,7 +103,7 @@ Deno.test("masks a hidden achievement before it leaves the server", async () => 
 
     const events = await listFollowedTimeline(client, me.id, 40);
     const unlock = events.find((event) => event.kind === "unlock");
-    assertEquals(unlock?.achievementTitle, "??????");
+    assertEquals(unlock?.achievementTitle, "隠し実績");
     assertEquals(unlock?.hidden, true);
     // The points are not a secret — only the wording is.
     assertEquals(unlock?.points, 50);
