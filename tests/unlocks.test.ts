@@ -11,6 +11,7 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import type { GameManifest } from "@game-center/protocol";
 import { registerGame } from "../server/db/games.ts";
 import {
+  listGameProgress,
   listUnlocks,
   listUnlocksForGame,
   totalPoints,
@@ -353,5 +354,105 @@ Deno.test("folds a key repeated in one call, keeping the best score", async () =
       "kuboon/my-puzzle",
     );
     assertEquals(unlocks.map((u) => [u.key, u.score]), [["high_score", 1200]]);
+  });
+});
+
+Deno.test("sums a record up per game, most recently played first", async () => {
+  await migratedDb(async (client) => {
+    const player = await playable(client);
+    const author = await upsertUser(client, "kuboon", "author");
+    await registerGame(
+      client,
+      {
+        ownerId: author.id,
+        authorHandle: "kuboon",
+        manifestUrl: "https://example.github.io/maze/gamecenter.json",
+      },
+      {
+        id: "maze",
+        author: "kuboon",
+        title: "Maze",
+        achievements: [
+          { key: "exit", title: "出口", points: 5, hidden: false },
+          { key: "fast", title: "速攻", points: 15, hidden: true },
+        ],
+      },
+      "https://example.github.io/maze/",
+    );
+
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "first_clear",
+      {
+        via: "rest",
+      },
+    );
+    await unlockAchievement(client, player.id, "kuboon/maze", "exit", {
+      via: "rest",
+    });
+    // Same-second timestamps would leave the order to the tie-break.
+    await client.execute({
+      sql: `update user_achievements set unlocked_at = '2026-01-01 00:00:00'
+             where user_id = ? and achievement_id =
+                   (select id from achievements where game_id = 'kuboon/maze')`,
+      args: [player.id],
+    });
+
+    assertEquals(await listGameProgress(client, player.id), [
+      {
+        gameId: "kuboon/my-puzzle",
+        gameTitle: "My Puzzle",
+        unlocked: 1,
+        total: 2,
+        points: 10,
+        totalPoints: 40,
+        lastUnlockedAt: (await listUnlocksForGame(
+          client,
+          player.id,
+          "kuboon/my-puzzle",
+        ))[0].unlockedAt,
+      },
+      {
+        gameId: "kuboon/maze",
+        gameTitle: "Maze",
+        unlocked: 1,
+        total: 2,
+        points: 5,
+        totalPoints: 20,
+        lastUnlockedAt: "2026-01-01 00:00:00",
+      },
+    ]);
+  });
+});
+
+Deno.test("counts progress against the live manifest only", async () => {
+  await migratedDb(async (client) => {
+    const player = await playable(client);
+    await unlockAchievement(
+      client,
+      player.id,
+      "kuboon/my-puzzle",
+      "high_score",
+      {
+        via: "rest",
+        score: 1200,
+      },
+    );
+    await register(client, {
+      ...manifest,
+      achievements: [manifest.achievements[0]],
+    });
+
+    // Still a game they played, but the retired unlock is no longer part of
+    // it: none of one, not one of one.
+    const [progress] = await listGameProgress(client, player.id);
+    assertEquals(progress.unlocked, 0);
+    assertEquals(progress.total, 1);
+    assertEquals(progress.points, 0);
+    assertEquals(progress.totalPoints, 10);
+    // The record itself keeps it.
+    assertEquals(await totalPoints(client, player.id), 30);
   });
 });

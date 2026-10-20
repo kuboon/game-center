@@ -13,7 +13,7 @@
  */
 
 /** The stand-in shown where a hidden achievement's name would go. */
-export const MASKED_TITLE = "??????";
+export const MASKED_TITLE = "隠し実績";
 
 /** Just enough of an achievement to decide what to call it. */
 export interface Nameable {

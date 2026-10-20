@@ -18,6 +18,7 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
+import { formatDate, formatPoints, formatScore } from "./achievement_view.tsx";
 import { mountSession, sessionStore } from "./session.ts";
 
 export interface TimelineProps {
@@ -124,7 +125,7 @@ function row(event: TimelineEvent) {
         </a>
         {event.kind === "game" ? " がゲームを登録しました" : " が実績を解除"}
         {" · "}
-        {event.at.slice(0, 10)}
+        {formatDate(event.at)}
       </p>
       {event.kind === "unlock"
         ? (
@@ -134,13 +135,17 @@ function row(event: TimelineEvent) {
             </span>
             {event.points !== null
               ? (
-                <span class="badge badge-ghost badge-sm">
-                  {event.points} pt
+                <span class="text-xs opacity-70">
+                  {formatPoints(event.points)}
                 </span>
               )
               : null}
             {event.score !== null
-              ? <span class="badge badge-sm">{event.score}</span>
+              ? (
+                <span class="text-xs tabular-nums">
+                  {formatScore(event.score)}
+                </span>
+              )
               : null}
           </div>
         )

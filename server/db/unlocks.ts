@@ -261,6 +261,74 @@ export async function listUnlocksForGame(
 }
 
 /**
+ * How far one player has got through one game.
+ *
+ * The unit a record is summed up in. A list of every unlock across every game,
+ * newest first, mixes games together and answers no question a player asks;
+ * "how much of this game have I done" is the one they do.
+ *
+ * Counted against what the manifest declares now. A retired achievement the
+ * player still holds is part of their record — `listUnlocks` and `totalPoints`
+ * keep it — but it is not part of the game any more, and counting it here
+ * would let a player stand at seven of six.
+ */
+export interface GameProgress {
+  readonly gameId: string;
+  readonly gameTitle: string;
+  /** Live achievements the player has unlocked. */
+  readonly unlocked: number;
+  /** Live achievements the game declares. */
+  readonly total: number;
+  /** Points from {@link unlocked}. */
+  readonly points: number;
+  /** Points the game declares in all. */
+  readonly totalPoints: number;
+  /** The player's latest unlock in this game, retired ones included. */
+  readonly lastUnlockedAt: string;
+}
+
+/**
+ * Every game a player has unlocked something in, most recently played first.
+ *
+ * Withdrawn games stay. The player's records in them are untouched by the
+ * withdrawal (see `retireGame`), and so is the page they link to.
+ */
+export async function listGameProgress(
+  client: Client,
+  userId: number,
+): Promise<GameProgress[]> {
+  const result = await client.execute({
+    sql: `select games.id as game_id, games.title as game_title,
+                 sum(achievements.retired = 0) as unlocked,
+                 coalesce(sum(case when achievements.retired = 0
+                                   then achievements.points end), 0) as points,
+                 max(user_achievements.unlocked_at) as last_unlocked_at,
+                 (select count(*) from achievements live
+                   where live.game_id = games.id and live.retired = 0) as total,
+                 (select coalesce(sum(live.points), 0) from achievements live
+                   where live.game_id = games.id and live.retired = 0)
+                   as total_points
+            from user_achievements
+            join achievements
+              on achievements.id = user_achievements.achievement_id
+            join games on games.id = achievements.game_id
+           where user_achievements.user_id = ?
+           group by games.id
+           order by last_unlocked_at desc, games.id`,
+    args: [userId],
+  });
+  return result.rows.map((row) => ({
+    gameId: String(row.game_id),
+    gameTitle: String(row.game_title),
+    unlocked: Number(row.unlocked),
+    total: Number(row.total),
+    points: Number(row.points),
+    totalPoints: Number(row.total_points),
+    lastUnlockedAt: String(row.last_unlocked_at),
+  }));
+}
+
+/**
  * One player's unlock of one achievement, as it appears next to somebody
  * else's.
  */

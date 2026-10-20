@@ -13,6 +13,11 @@
  * Author and player are not separate pages. They are the same account reached
  * at the same URL, which is also why there is one kind of follow rather than
  * two.
+ *
+ * A record is summed up per game first — how far through each, the same rows
+ * as on `/me` — and only then the latest unlocks. What they have made comes
+ * last: most people reading this page came for the player, and the games are
+ * one click from the catalog anyway.
  */
 
 import type { Action } from "@remix-run/fetch-router";
@@ -20,19 +25,37 @@ import type { Action } from "@remix-run/fetch-router";
 import { parseGameRef } from "@game-center/protocol";
 
 import { FollowButton } from "../../client/follow_button.tsx";
+import {
+  achievementMark,
+  formatDate,
+  formatPoints,
+  formatScore,
+  progressRow,
+} from "../../client/achievement_view.tsx";
 import { ShareRow } from "../../client/share_row.tsx";
 import { getDb } from "../db/client.ts";
 import { countFollows } from "../db/follows.ts";
 import { listGamesOwnedBy } from "../db/games.ts";
-import { listUnlocks, totalPoints, type Unlock } from "../db/unlocks.ts";
+import {
+  listGameProgress,
+  listUnlocks,
+  totalPoints,
+  type Unlock,
+} from "../db/unlocks.ts";
 import { findUserByHandle } from "../db/users.ts";
 import { publicTitle } from "../lib/spoilers.ts";
 import { routes } from "../routes.ts";
 import { profileMeta } from "../ui/share_cards.ts";
 import { renderPage } from "../utils/render.tsx";
 
-/** How much of a record to show before it stops being a summary. */
-const RECENT_UNLOCKS = 20;
+/** How many games to show before it stops being a summary. */
+const PLAYED_GAMES = 5;
+
+/**
+ * How many single unlocks to show. Fewer than before: the games above already
+ * say how much someone has done, and this is only what they did lately.
+ */
+const RECENT_UNLOCKS = 10;
 
 export const authorPageAction = {
   async handler(context) {
@@ -57,14 +80,16 @@ export const authorPageAction = {
       );
     }
 
-    const [games, unlocks, follows, points] = await Promise.all([
+    const [games, played, unlocks, follows, points] = await Promise.all([
       listGamesOwnedBy(client, author.id),
+      listGameProgress(client, author.id),
       listUnlocks(client, author.id),
       countFollows(client, author.id),
       totalPoints(client, author.id),
     ]);
     const active = games.filter((game) => game.status === "active");
     const recent = unlocks.slice(0, RECENT_UNLOCKS);
+    const playedShown = played.slice(0, PLAYED_GAMES);
 
     return renderPage(
       context,
@@ -95,19 +120,44 @@ export const authorPageAction = {
           }
           <dl class="stats stats-horizontal border-base-300 border">
             <div class="stat px-5 py-3">
-              <dt class="stat-title text-xs">ポイント</dt>
+              <dt class="stat-title text-xs">獲得ポイント</dt>
               <dd class="stat-value text-2xl tabular-nums">{points}</dd>
             </div>
             <div class="stat px-5 py-3">
-              <dt class="stat-title text-xs">実績</dt>
+              <dt class="stat-title text-xs">解除</dt>
               <dd class="stat-value text-2xl tabular-nums">{unlocks.length}</dd>
             </div>
             <div class="stat px-5 py-3">
-              <dt class="stat-title text-xs">ゲーム</dt>
-              <dd class="stat-value text-2xl tabular-nums">{active.length}</dd>
+              <dt class="stat-title text-xs">遊んだゲーム</dt>
+              <dd class="stat-value text-2xl tabular-nums">{played.length}</dd>
             </div>
           </dl>
         </div>
+
+        <section class="space-y-3">
+          <h2 class="text-xl font-bold">遊んでいるゲーム</h2>
+          {playedShown.length === 0
+            ? <p class="opacity-70">まだどのゲームも遊んでいません。</p>
+            : (
+              <ul class="border-base-300 border-b">
+                {playedShown.map(progressRow)}
+              </ul>
+            )}
+          {played.length > playedShown.length
+            ? (
+              <p class="text-sm opacity-70">
+                ほか {played.length - playedShown.length} ゲーム
+              </p>
+            )
+            : null}
+        </section>
+
+        {recent.length === 0 ? null : (
+          <section class="space-y-3">
+            <h2 class="text-xl font-bold">最近の解除</h2>
+            <ul class="space-y-3">{recent.map(unlockRow)}</ul>
+          </section>
+        )}
 
         <section class="space-y-3">
           <h2 class="text-xl font-bold">作ったゲーム</h2>
@@ -118,20 +168,6 @@ export const authorPageAction = {
                 {active.map((game) => gameRow(game, author.handle))}
               </ul>
             )}
-        </section>
-
-        <section class="space-y-3">
-          <h2 class="text-xl font-bold">解除した実績</h2>
-          {recent.length === 0
-            ? <p class="opacity-70">解除した実績はまだありません。</p>
-            : <ul class="space-y-3">{recent.map(unlockRow)}</ul>}
-          {unlocks.length > recent.length
-            ? (
-              <p class="text-sm opacity-70">
-                ほか {unlocks.length - recent.length} 件
-              </p>
-            )
-            : null}
         </section>
       </main>,
       profileMeta(author, {
@@ -169,42 +205,53 @@ function gameRow(
  * One unlocked achievement.
  *
  * Hidden achievements keep their title hidden even here. The page is public
- * and this is somebody else's record for almost everyone reading it; a player
- * who wants to read their own titles has `/me`. Spoiling a game to everyone
- * who visits its author's page would be a poor trade for a line of text.
+ * and this is somebody else's record for almost everyone reading it, the owner
+ * included when they come to see what others see. A player reads their own
+ * hidden titles on the game's page, where their unlocks carry them. Spoiling a
+ * game to everyone who visits its author's page would be a poor trade for a
+ * line of text.
  */
 function unlockRow(unlock: Unlock) {
   const ref = parseGameRef(unlock.gameId);
   return (
     <li
       key={`${unlock.gameId}/${unlock.key}`}
-      class="border-base-300 border-t pt-3"
+      class="border-base-300 flex gap-3 border-t pt-3"
     >
-      <div class="flex flex-wrap items-baseline gap-2">
-        <span class="font-bold">{publicTitle(unlock)}</span>
-        <span class="badge badge-ghost badge-sm">{unlock.points} pt</span>
-        {unlock.score !== null
-          ? <span class="badge badge-sm">{unlock.score}</span>
-          : null}
+      {achievementMark("unlocked")}
+      <div class="min-w-0 space-y-0.5">
+        <div class="flex flex-wrap items-baseline gap-x-2">
+          <span class={unlock.hidden ? "font-bold opacity-70" : "font-bold"}>
+            {publicTitle(unlock)}
+          </span>
+          <span class="text-xs opacity-70">{formatPoints(unlock.points)}</span>
+          {unlock.score !== null
+            ? (
+              <span class="text-xs tabular-nums">
+                {formatScore(unlock.score)}
+              </span>
+            )
+            : null}
+        </div>
+        <p class="text-xs opacity-70">
+          {ref
+            ? (
+              <a
+                class="link link-hover"
+                href={routes.game.href({
+                  handle: ref.author,
+                  slug: ref.slug,
+                })}
+                data-rmx-target="content"
+              >
+                {unlock.gameTitle}
+              </a>
+            )
+            : unlock.gameTitle}
+          {" · "}
+          {formatDate(unlock.unlockedAt)}
+        </p>
       </div>
-      <p class="text-sm opacity-70">
-        {ref
-          ? (
-            <a
-              class="link link-hover"
-              href={routes.game.href({
-                handle: ref.author,
-                slug: ref.slug,
-              })}
-              data-rmx-target="content"
-            >
-              {unlock.gameTitle}
-            </a>
-          )
-          : unlock.gameTitle}
-        {" · "}
-        {unlock.unlockedAt.slice(0, 10)}
-      </p>
     </li>
   );
 }
