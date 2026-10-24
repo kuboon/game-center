@@ -10,14 +10,14 @@
 
 import type { RequestContext, Router } from "@remix-run/fetch-router";
 import { createHtmlResponse } from "@remix-run/response/html";
-import type { RemixNode } from "@remix-run/ui";
-import { renderToStream } from "@remix-run/ui/server";
+import type { RemixNode } from "@remix-run/component";
+import { renderToStream } from "@remix-run/component/server";
 
 import { Document } from "../ui/document.tsx";
 import { absoluteUrl, type PageMeta } from "../ui/page_meta.ts";
 
 /**
- * Request headers the hub invented, not `@remix-run/ui`'s DOM attributes.
+ * Request headers the hub invented, not `@remix-run/component`'s DOM attributes.
  *
  * `ui@0.8.0` renamed every `rmx-*` attribute to `data-rmx-*`; these two are
  * HTTP header names both ends of this app agree on, and renaming them would

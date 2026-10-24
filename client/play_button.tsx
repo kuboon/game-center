@@ -30,7 +30,7 @@ import {
   type Handle,
   on,
   type SerializableValue,
-} from "@remix-run/ui";
+} from "@remix-run/component";
 
 import { mountSession, sessionStore } from "./session.ts";
 

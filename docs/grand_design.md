@@ -117,7 +117,7 @@ GitHub Pages / Claude Artifacts ◀───────┘
 | 領域 | 選定 | 補足 |
 |---|---|---|
 | ランタイム | Deno (workspace 構成) | package.json は置かない |
-| Web フレームワーク | Remix v3 (`@remix-run/fetch-router` + `@remix-run/ui`) | [deno-remix-reference](https://github.com/kuboon/deno-remix-reference) の構成に従う |
+| Web フレームワーク | Remix v3 (`@remix-run/fetch-router` + `@remix-run/component`) | [deno-remix-reference](https://github.com/kuboon/deno-remix-reference) の構成に従う |
 | スタイル | Tailwind CSS v4 + daisyUI v5 | bundler パッケージでビルド |
 | DB | Turso (`npm:@libsql/client/web` + `@kuboon/remix-data-table-sqlite-turso`) | セッション等の揮発データも Turso に置く。Deno KV は使わない |
 | 認証 | id.kbn.one 連携 (DPoP、パスキー) | deno-remix-reference の実装を踏襲(後述) |
@@ -685,7 +685,7 @@ server/                      # Remix v3 アプリ (ハブ + API)
     client.ts                # Turso クライアント
     migrations/              # 連番 SQL
   tests/
-client/                      # ブラウザエントリ、@remix-run/ui の run() で hydrate
+client/                      # ブラウザエントリ、@remix-run/component の run() で hydrate
 bundler/                     # Deno.bundle + Tailwind ビルド → bundled/
 packages/
   protocol/                  # gamecenter.json の JSON Schema と共有型、検証関数

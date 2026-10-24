@@ -29,7 +29,7 @@ import {
   type Handle,
   on,
   type SerializableValue,
-} from "@remix-run/ui";
+} from "@remix-run/component";
 
 import { rememberFollowIntent, takeFollowIntent } from "./follow_intent.ts";
 import { mountSession, sessionStore } from "./session.ts";

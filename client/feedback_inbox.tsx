@@ -12,7 +12,7 @@
  * heading at all.
  */
 
-import { clientEntry, type Handle, on } from "@remix-run/ui";
+import { clientEntry, type Handle, on } from "@remix-run/component";
 
 import { formatDate } from "./achievement_view.tsx";
 import { mountSession, sessionStore } from "./session.ts";

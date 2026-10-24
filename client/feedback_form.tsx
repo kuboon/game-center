@@ -17,7 +17,7 @@
  *
  * The draft goes in through `ref`, as the element's live value, and **not**
  * through `defaultValue`. On a `<textarea>`, `defaultValue` is the element's
- * text content, and `@remix-run/ui@0.8` reconciles that content against the
+ * text content, and the runtime (seen on `@remix-run/ui@0.8`) reconciles that content against the
  * vtree's children — which for a textarea are always none. So the first
  * re-render after the form appears deletes the draft, and something always
  * re-renders: the session settling is enough. The draft showed for a moment
@@ -31,7 +31,7 @@ import {
   on,
   ref,
   type SerializableValue,
-} from "@remix-run/ui";
+} from "@remix-run/component";
 
 import {
   type FeedbackKind,

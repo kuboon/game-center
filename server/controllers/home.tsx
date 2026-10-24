@@ -123,7 +123,7 @@ export const homeAction = {
 /**
  * One cabinet in the row.
  *
- * A plain function rather than a component: `@remix-run/ui` components take a
+ * A plain function rather than a component: `@remix-run/component` components take a
  * handle and return a render function, which is more machinery than a piece of
  * static markup needs.
  */

@@ -2,7 +2,7 @@
  * No `<textarea>` takes its text from `defaultValue`.
  *
  * On a textarea, `defaultValue` is the element's text content, and
- * `@remix-run/ui@0.8` reconciles that content against the vtree's children —
+ * the runtime (seen on `@remix-run/ui@0.8`) reconciles that content against the vtree's children —
  * which a textarea's props type forbids, so they are always none. The text is
  * there on the first paint and gone on the next render. Nothing reports it:
  * the type checker accepts the prop, and a page that renders once looks fine.

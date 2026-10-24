@@ -15,9 +15,9 @@ Deno workspace。
   トークン検証、`middleware/dpop.ts` が DPoP セッション
 - `db/migrations/` — マイグレーション。`YYYYMMDDHHmmss_name/up.sql` と
   `down.sql`
-- `client/` — ブラウザエントリ。`@remix-run/ui` の `run()` が clientEntry を
-  hydrate し、`<Frame name="content">` のナビゲーションを担う。`session.ts` が
-  DPoP セッションの共有ストア
+- `client/` — ブラウザエントリ。`@remix-run/component` の `run()` が clientEntry
+  を hydrate し、`<Frame name="content">` のナビゲーションを担う。`session.ts`
+  が DPoP セッションの共有ストア
 - `packages/` — ワークスペース内のライブラリ。`protocol` が `gamecenter.json`
   の型・検証・JSON Schema。`session_storage_kv`(KvRepo → SessionStorage)と
   `dpop_session_middleware`(DPoP セッション)は未公開のため id.kbn.one /
@@ -48,7 +48,7 @@ deno task db …    # migrate / rollback / status / seed / reset / wipe
 
 - **`codeSplitting` は最適化ではなく正しさの要件**。clientEntry
   はそれぞれ別のエントリポイントとして bundle されるが、分割を切ると
-  `@remix-run/ui` のランタイムが各ファイルに複製される。ランタイムには
+  `@remix-run/component` のランタイムが各ファイルに複製される。ランタイムには
   モジュールスコープの同一性で値を見分ける箇所があり(`on("click", …)` が付ける
   `onMixinType` を reconciler が `===` で比較する)、複製されると照合が黙って
   外れて **イベントリスナが一つも張られない**。hydrate も render も走るので
@@ -523,6 +523,12 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - テストは `Deno.test()` + `@std/assert`
 - ファイル名はスネークケース
 - JSX の属性は `class`(`className` ではない)
+- **UI ランタイムは `@remix-run/component`**(Remix 3.0 で `@remix-run/ui` から
+  戻った)。`@remix-run/ui` は 0.12 以降 headless な UI 部品と animation だけの
+  別パッケージで、`run()` も `clientEntry` も JSX ランタイムも入っていない。
+  `jsxImportSource` も `@remix-run/component`。`@remix-run/*` は 1.x で、
+  `minimumDependencyAge`(1 日)より新しい版は解決されないので `^1.0.0` で書いて
+  おき、日が経ってから relock する
 - **フレーム遷移の属性は `data-rmx-*`**(`data-rmx-target="content"` など)。
   `@remix-run/ui@0.8.0` で `rmx-*` から改名された。エイリアスも警告も無く、
   TypeScript はハイフンを含む JSX 属性名を検査しないので、古い綴りを書いても
@@ -536,10 +542,10 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 - ただし **`rmx-frame` と `rmx-target` の「ヘッダ」は改名しない**
   (`server/utils/render.tsx` と `client/frame.ts` の `FRAME_HEADER` /
   `TARGET_HEADER`)。これはハブが自分で決めた HTTP ヘッダ名であって
-  `@remix-run/ui` の DOM 属性ではない。改名するとサーバが自分のリクエストを
-  認識できなくなるだけ
+  `@remix-run/component` の DOM
+  属性ではない。改名するとサーバが自分のリクエストを 認識できなくなるだけ
 - **`<textarea>` に `defaultValue` を渡さない**。textarea の `defaultValue` は
-  中身のテキストで、`@remix-run/ui@0.8` は中身を vtree の children(textarea は
+  中身のテキストで、ランタイムは中身を vtree の children(textarea は
   常に空)と突き合わせるので、次の再描画で消える。初期値は `ref()` で要素の
   `value` に入れる(`client/feedback_form.tsx`)。最初の描画では出ているので
   一枚描いて確かめても気づけない。`tests/textarea_default.test.ts`

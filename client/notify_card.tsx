@@ -24,7 +24,7 @@ import {
   type Handle,
   on,
   type SerializableValue,
-} from "@remix-run/ui";
+} from "@remix-run/component";
 
 import { detectPushStatus } from "@kuboon/browser-how-to/push";
 import { showPushGuide } from "@kuboon/browser-how-to/push/ui";

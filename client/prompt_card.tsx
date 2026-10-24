@@ -12,7 +12,7 @@
  * server-rendered page carries no DPoP proof to learn who that is.
  */
 
-import { clientEntry, type Handle, on } from "@remix-run/ui";
+import { clientEntry, type Handle, on } from "@remix-run/component";
 
 import { mountSession, sessionStore } from "./session.ts";
 

@@ -7,7 +7,7 @@
  * **`codeSplitting` is not an optimization here — it is required for
  * correctness.** `run()` in `mod.js` owns the reconciler; every other entry is
  * a `clientEntry` module it imports at hydration time. Without splitting, each
- * entry gets its own inlined copy of the `@remix-run/ui` runtime, and the two
+ * entry gets its own inlined copy of the `@remix-run/component` runtime, and the two
  * copies do not recognize each other's values: `on("click", …)` builds a mixin
  * descriptor tagged with its own module-scoped `onMixinType`, the reconciler in
  * `mod.js` compares it against *its* `onMixinType`, the identity check fails,

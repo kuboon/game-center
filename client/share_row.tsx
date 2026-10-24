@@ -25,7 +25,7 @@
  * shares the page the reader is actually looking at.
  */
 
-import { clientEntry } from "@remix-run/ui";
+import { clientEntry } from "@remix-run/component";
 
 // Registers `<share-buttons>` where there is a DOM, and does nothing on the
 // server, so this import is safe in a module the SSR render also evaluates.

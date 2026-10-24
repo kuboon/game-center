@@ -9,7 +9,7 @@
  * `<a data-rmx-target="content">` swap the frame instead of navigating.
  */
 
-import { run } from "@remix-run/ui";
+import { run } from "@remix-run/component";
 
 import { resolveFrame } from "./frame.ts";
 

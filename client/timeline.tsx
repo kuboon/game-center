@@ -16,7 +16,7 @@ import {
   clientEntry,
   type Handle,
   type SerializableValue,
-} from "@remix-run/ui";
+} from "@remix-run/component";
 
 import { formatDate, formatPoints, formatScore } from "./achievement_view.tsx";
 import { mountSession, sessionStore } from "./session.ts";
