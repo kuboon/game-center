@@ -35,6 +35,11 @@ import {
   internalUnfollowAction,
 } from "./controllers/api/internal_follows.ts";
 import { internalGameProgressAction } from "./controllers/api/internal_game_progress.ts";
+import {
+  internalFeedbackDeleteAction,
+  internalFeedbackListAction,
+  internalGameFeedbackAction,
+} from "./controllers/api/internal_feedback.ts";
 import { internalMeAchievementsAction } from "./controllers/api/internal_me.ts";
 import {
   internalClaimAction,
@@ -43,6 +48,7 @@ import {
 } from "./controllers/api/internal_play.ts";
 import { internalSessionAction } from "./controllers/api/session.ts";
 import { claimAllPageAction, claimPageAction } from "./controllers/claim.tsx";
+import { feedbackPageAction } from "./controllers/feedback.tsx";
 import { devAction } from "./controllers/dev.tsx";
 import { authorPageAction } from "./controllers/author.tsx";
 import { gamePageAction } from "./controllers/game.tsx";
@@ -95,6 +101,7 @@ router.get(routes.home, homeAction);
 router.get(routes.game, gamePageAction);
 router.get(routes.claimAll, claimAllPageAction);
 router.get(routes.claim, claimPageAction);
+router.get(routes.feedback, feedbackPageAction);
 router.get(routes.author, authorPageAction);
 router.get(routes.me, meAction);
 router.get(routes.dev, devAction);
@@ -122,6 +129,9 @@ router.get(routes.internalFollowers, internalFollowersAction);
 router.post(routes.internalFollowersSeen, internalFollowersSeenAction);
 router.get(routes.internalTimeline, internalTimelineAction);
 router.get(routes.internalGameProgress, internalGameProgressAction);
+router.post(routes.internalGameFeedback, internalGameFeedbackAction);
+router.get(routes.internalFeedback, internalFeedbackListAction);
+router.delete(routes.internalFeedbackDelete, internalFeedbackDeleteAction);
 router.delete(routes.internalGameRetire, internalGameRetireAction);
 router.post(routes.internalGameRestore, internalGameRestoreAction);
 

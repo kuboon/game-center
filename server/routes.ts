@@ -17,6 +17,7 @@ export const routes = route({
   game: get("/@:handle/:slug"),
   claimAll: get("/claim/@:handle/:slug"),
   claim: get("/claim/@:handle/:slug/:key"),
+  feedback: get("/feedback/@:handle/:slug"),
   me: get("/me"),
   dev: get("/dev"),
   schema: get("/schema/gamecenter.json"),
@@ -43,6 +44,9 @@ export const routes = route({
   internalCatalog: get("/api/internal/catalog"),
   internalTimeline: get("/api/internal/timeline"),
   internalGameProgress: get("/api/internal/games/@:handle/:slug/progress"),
+  internalGameFeedback: post("/api/internal/games/@:handle/:slug/feedback"),
+  internalFeedback: get("/api/internal/feedback"),
+  internalFeedbackDelete: del("/api/internal/feedback/:id"),
   internalGameRetire: del("/api/internal/games/@:handle/:slug"),
   internalGameRestore: post("/api/internal/games/@:handle/:slug/restore"),
 

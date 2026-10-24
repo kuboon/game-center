@@ -220,6 +220,18 @@ Deno.test("GET /@{author}/{slug} says so when the game is unknown", async () => 
   assertStringIncludes(await response.text(), "ゲームが見つかりません");
 });
 
+Deno.test("GET /feedback/@{author}/{slug} says so when the game is unknown", async () => {
+  // The SDK hands every game this link, so the route has to exist even before
+  // the game does.
+  const response = await router.fetch(
+    new Request("http://localhost/feedback/@kuboon/nope", {
+      headers: { "rmx-frame": "1" },
+    }),
+  );
+  assertEquals(response.status, 200);
+  assertStringIncludes(await response.text(), "ゲームが見つかりません");
+});
+
 Deno.test("GET /claim/... says so when the achievement is unknown", async () => {
   const response = await router.fetch(
     new Request("http://localhost/claim/@kuboon/nope/first_clear", {
@@ -345,6 +357,25 @@ Deno.test("your progress in a game needs a session", async () => {
   );
   assertEquals(response.status, 401);
   assertEquals(response.headers.get("cache-control"), "no-store");
+});
+
+Deno.test("feedback needs a session, to send and to read", async () => {
+  // A report carries its sender's name, and an inbox is its author's alone.
+  const requests: Array<[string, RequestInit]> = [
+    ["/api/internal/games/@kuboon/puzzle/feedback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "bug", message: "x" }),
+    }],
+    ["/api/internal/feedback", {}],
+    ["/api/internal/feedback/1", { method: "DELETE" }],
+  ];
+  for (const [path, init] of requests) {
+    const response = await router.fetch(
+      new Request(`http://localhost${path}`, init),
+    );
+    assertEquals(response.status, 401, `${init.method ?? "GET"} ${path}`);
+  }
 });
 
 Deno.test("the catalog tells a crawler what game-center is", async () => {

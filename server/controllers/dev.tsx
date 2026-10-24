@@ -19,6 +19,7 @@
 import type { Action } from "@remix-run/fetch-router";
 
 import { DevConsole } from "../../client/dev_console.tsx";
+import { FeedbackInbox } from "../../client/feedback_inbox.tsx";
 import { PromptCard } from "../../client/prompt_card.tsx";
 import type { routes } from "../routes.ts";
 import { renderPage } from "../utils/render.tsx";
@@ -108,6 +109,8 @@ export const devAction = {
             </p>
           </div>
         </div>
+
+        <FeedbackInbox />
 
         <DevConsole returnTo="/dev" />
       </main>,

@@ -128,6 +128,22 @@ export const gamePageAction = {
             hidden: achievement.hidden,
           }))}
         />
+
+        {
+          /* Reachable without the game's help: a game that never adopted
+            `feedbackLink()` still has players with something to say. */
+        }
+        <p class="text-sm opacity-70">
+          不具合や要望は{" "}
+          <a
+            class="link"
+            href={routes.feedback.href({ handle, slug })}
+            data-rmx-target="content"
+          >
+            フィードバック
+          </a>
+          から。
+        </p>
       </main>,
       gameMeta(
         game,
