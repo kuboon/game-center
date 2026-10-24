@@ -1,23 +1,21 @@
 /**
- * PromptCard — everything an AI needs to add game-center support, ready to
- * paste.
+ * The instruction an AI needs to add GameCenter support, ready to paste, and
+ * the button that copies it.
  *
  * A manifest has to name its author, and that name is the identifier the IdP
  * issued: unique, stable, and not something anyone should be transcribing by
  * hand. So the hub writes the whole instruction — the id already filled in, the
- * script tag, the schema, what to do next — and the player copies it into
+ * script tag, the schema, what to do next — and the author copies it into
  * whatever is building their game.
  *
- * A `clientEntry` because the identifier is the signed-in player's, and a
- * server-rendered page carries no DPoP proof to learn who that is.
+ * Rendered by {@link DevConsole}, which already knows the author id: it is in
+ * the same answer as the games and the queue.
  */
 
-import { clientEntry, type Handle, on } from "@remix-run/component";
-
-import { mountSession, sessionStore } from "./session.ts";
+import { on } from "@remix-run/component";
 
 /** The instruction, with the player's own handle already in it. */
-function prompt(handle: string): string {
+export function prompt(handle: string): string {
   return `このゲームを GameCenter (https://ga-cen.kbn.one) に対応させてください。
 
 ## 1. マニフェストをページに埋め込む
@@ -125,82 +123,41 @@ curl -X POST https://ga-cen.kbn.one/api/registry/v1/games \\
 https://ga-cen.kbn.one/dev の「貼り付けて登録」に貼ってもらってください。`;
 }
 
-export const PromptCard = clientEntry(
-  "/prompt_card.js#PromptCard",
-  function PromptCard(handle: Handle) {
-    let myHandle: string | null = null;
-    let loaded = false;
-    let copied = false;
+/**
+ * Copy the instruction for `handle`.
+ *
+ * @returns Whether the clipboard took it. When it refuses (insecure context,
+ * denied permission) the text is on screen and selectable, so there is still a
+ * way through.
+ */
+export async function copyPrompt(handle: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(prompt(handle));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-    const session = mountSession(handle, load);
-
-    async function load(): Promise<void> {
-      const { fetchDpop, userId } = sessionStore;
-      if (!userId || !fetchDpop) {
-        loaded = session.ready;
-        handle.update();
-        return;
-      }
-      try {
-        const response = await fetchDpop("/api/internal/games");
-        if (response.ok) {
-          myHandle =
-            ((await response.json()) as { handle: string | null }).handle;
-        }
-      } catch {
-        // Leave it unknown rather than showing an instruction with a hole in it.
-      } finally {
-        loaded = true;
-        handle.update();
-      }
-    }
-
-    const onCopyClick = async () => {
-      if (!myHandle) return;
-      try {
-        await navigator.clipboard.writeText(prompt(myHandle));
-        copied = true;
-        handle.update();
-      } catch {
-        // Clipboard refused (insecure context, denied permission). The text is
-        // on screen and selectable, so there is still a way through.
-        copied = false;
-        handle.update();
-      }
-    };
-
-    return () => {
-      if (!session.ready || !sessionStore.userId) return null;
-      if (!loaded) return <p>読み込み中…</p>;
-      if (!myHandle) return null;
-
-      return (
-        <div class="card card-border bg-base-100">
-          <div class="card-body">
-            <h2 class="card-title">ゲームを作る AI に渡す</h2>
-            <p>
-              あなたの作者 ID は <code class="break-all">{myHandle}</code>{" "}
-              です。 これを含んだ手順一式を用意したので、ゲームを作っている AI
-              にそのまま貼ってください。
-            </p>
-            <div class="card-actions">
-              <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                mix={[on("click", onCopyClick)]}
-              >
-                {copied ? "コピーしました" : "プロンプトをコピー"}
-              </button>
-            </div>
-            <details>
-              <summary class="cursor-pointer text-sm opacity-70">
-                中身を見る
-              </summary>
-              <pre class="bg-base-200 mt-2 overflow-x-auto rounded-box p-4 text-xs whitespace-pre-wrap"><code>{prompt(myHandle)}</code></pre>
-            </details>
-          </div>
-        </div>
-      );
-    };
-  },
-);
+/** The copy button, with the instruction itself folded underneath. */
+export function promptCopy(
+  handle: string,
+  copied: boolean,
+  onCopy: () => void | Promise<void>,
+) {
+  return (
+    <div class="space-y-2">
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        mix={[on("click", onCopy)]}
+      >
+        {copied ? "コピーしました" : "プロンプトをコピー"}
+      </button>
+      <details>
+        <summary class="cursor-pointer text-sm opacity-70">中身を見る</summary>
+        <pre class="bg-base-200 mt-2 overflow-x-auto rounded-box p-4 text-xs whitespace-pre-wrap"><code>{prompt(handle)}</code></pre>
+      </details>
+    </div>
+  );
+}
