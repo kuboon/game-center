@@ -43,7 +43,7 @@
   ],
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "@remix-run/ui"
+    "jsxImportSource": "@remix-run/component"
   },
   "imports": {
     "daisyui": "npm:daisyui@^5.5.19",

@@ -10,7 +10,7 @@
  * server-rendered page cannot carry.
  */
 
-import { clientEntry, type Handle, on } from "@remix-run/ui";
+import { clientEntry, type Handle, on } from "@remix-run/component";
 
 import { type ProgressRow, progressRow } from "./achievement_view.tsx";
 import { mountSession, sessionStore } from "./session.ts";

@@ -23,7 +23,7 @@ import {
   type Handle,
   on,
   type SerializableValue,
-} from "@remix-run/ui";
+} from "@remix-run/component";
 
 import { rememberClaimIntent, takeClaimIntent } from "./claim_intent.ts";
 import {

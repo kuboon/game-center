@@ -19,7 +19,7 @@ import {
   type Handle,
   on,
   type SerializableValue,
-} from "@remix-run/ui";
+} from "@remix-run/component";
 
 import { createA2hs } from "@kuboon/browser-how-to/a2hs";
 import { showA2hsGuide } from "@kuboon/browser-how-to/a2hs/ui";

@@ -1,5 +1,5 @@
 /**
- * The client bundles must share one copy of the `@remix-run/ui` runtime.
+ * The client bundles must share one copy of the `@remix-run/component` runtime.
  *
  * `run()` lives in `mod.js` and owns the reconciler; every `clientEntry` is a
  * separate module it imports at hydration time. Parts of the runtime identify
@@ -42,7 +42,7 @@ Deno.test("the ui runtime is not duplicated across entries", () => {
   assertEquals(
     carriers.map((file) => file.name).sort(),
     carriers.slice(0, 1).map((file) => file.name),
-    "more than one bundle carries the @remix-run/ui runtime; " +
+    "more than one bundle carries the @remix-run/component runtime; " +
       "code splitting is off, so mixin identity checks will fail at runtime",
   );
 });

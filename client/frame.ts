@@ -5,10 +5,10 @@
  * resolver can be imported and asserted on without booting the runtime.
  */
 
-import type { ResolveFrameOptions } from "@remix-run/ui";
+import type { ResolveFrameOptions } from "@remix-run/component";
 
 /**
- * Request headers the hub invented, not `@remix-run/ui`'s DOM attributes.
+ * Request headers the hub invented, not `@remix-run/component`'s DOM attributes.
  *
  * `ui@0.8.0` renamed every `rmx-*` attribute to `data-rmx-*`; these two are
  * HTTP header names both ends of this app agree on, and renaming them would

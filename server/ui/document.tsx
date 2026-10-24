@@ -18,7 +18,7 @@
  * tool, and tools should follow the preference they set.
  */
 
-import { Frame, type Handle } from "@remix-run/ui";
+import { Frame, type Handle } from "@remix-run/component";
 
 import { NavAuth } from "../../client/nav_auth.tsx";
 import { routes } from "../routes.ts";
