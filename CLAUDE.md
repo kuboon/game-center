@@ -453,6 +453,15 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   登録の間違い。libSQL は外部キーを強制するので、cascade が無いと `retireGame`
   の削除が通らない
 - 1 人 1 時間に 5 件(`takeToken` の `feedback:{userId}`)。超過は 429
+- **ゲームは下書きを渡せる**(`#kind=bug&message=…`、`client/feedback_draft.ts`)。
+  claim リンクと同じくフラグメントで、送る前の本文がサーバに届かない。
+  あくまで下書きで、送るのはプレイヤーがボタンを押したとき。リンクだけで送れると、
+  開いた人の名前で報告を出させるリンクが配れてしまう
+- フラグメントはサインインの往復で消えるので、`sessionStorage` に一度だけ預ける
+  (`claim_intent.ts` と同じ形)
+- `feedbackUrl()` / `feedbackLink()` は本文が 4000 文字を超えると `RangeError`
+  を投げる。`unlock()` が投げないのとは逆で、こちらはゲームのコードの誤り。
+  受け付けられない下書きを載せたリンクは、リンクが無いより悪い
 
 ## 実績解除
 

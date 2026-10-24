@@ -6,6 +6,12 @@
  * DPoP session, which is also what puts their name on it. The author reads it
  * on `/dev`.
  *
+ * The link may carry a draft in its fragment (`#kind=bug&message=…`, see
+ * `feedback_draft.ts`): the type comes chosen and the text box filled, and the
+ * player still reads it and presses the button. The fragment is read before
+ * the form first draws, which is after the session answers, so there is no
+ * server markup for it to disagree with.
+ *
  * The text box is uncontrolled and read on input, like the paste box on /dev:
  * binding `value` to state makes the runtime revert the keystroke.
  */
@@ -17,6 +23,12 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
+import {
+  type FeedbackKind,
+  parseFeedbackDraft,
+  rememberFeedbackDraft,
+  takeFeedbackDraft,
+} from "./feedback_draft.ts";
 import { mountSession, sessionStore } from "./session.ts";
 
 export interface FeedbackFormProps {
@@ -29,7 +41,7 @@ export interface FeedbackFormProps {
   [key: string]: SerializableValue;
 }
 
-type Kind = "bug" | "request" | "other";
+type Kind = FeedbackKind;
 
 const KINDS: ReadonlyArray<readonly [Kind, string]> = [
   ["bug", "不具合"],
@@ -52,6 +64,19 @@ export const FeedbackForm = clientEntry(
     let kind: Kind = "bug";
     let message = "";
     let status: Status = { kind: "editing" };
+
+    if (typeof document !== "undefined") {
+      // The fragment first, then whatever was stashed before signing in. The
+      // stash is taken either way so it cannot surface on a later visit.
+      const gameId = `${handle.props.handle}/${handle.props.slug}`;
+      const stashed = takeFeedbackDraft(gameId);
+      const fromLink = parseFeedbackDraft(globalThis.location.hash);
+      const draft = fromLink.kind || fromLink.message
+        ? fromLink
+        : parseFeedbackDraft(stashed ?? "");
+      kind = draft.kind ?? kind;
+      message = draft.message ?? message;
+    }
 
     // Nothing to load: the form only needs to know whether anyone is signed
     // in, and mountSession re-renders when that is known.
@@ -84,8 +109,13 @@ export const FeedbackForm = clientEntry(
       handle.update();
     };
 
-    const onSignInClick = () =>
+    const onSignInClick = () => {
+      rememberFeedbackDraft(
+        `${handle.props.handle}/${handle.props.slug}`,
+        globalThis.location.hash,
+      );
       sessionStore.signIn(globalThis.location.pathname);
+    };
 
     return () => {
       if (!session.ready) return <p class="opacity-70">確認中…</p>;
@@ -147,6 +177,7 @@ export const FeedbackForm = clientEntry(
               <textarea
                 class="textarea textarea-bordered h-40 w-full"
                 maxlength={MAX_LENGTH}
+                defaultValue={message}
                 placeholder="どの画面で、何をしたら、どうなったか"
                 mix={[on("input", (event) => {
                   message = (event.currentTarget as HTMLTextAreaElement).value;
