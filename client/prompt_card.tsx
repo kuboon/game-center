@@ -84,6 +84,11 @@ https://ga-cen.kbn.one/claim/@${handle}/<id>#gc=first_clear,high_score:1200
 
 https://ga-cen.kbn.one/feedback/@${handle}/<id>
 
+ステージやエラー内容は下書きとして渡せます。プレイヤーに貼り付けを頼まないでください。
+gc.feedbackLink({ kind: "bug", message }) (SDK なしなら URL に
+#kind=bug&message=<encodeURIComponent した本文> を付ける)。message は 4000 文字まで、
+超えると feedbackLink() が RangeError を投げます。
+
 ## 3. 登録
 
 公開したあとに一度だけ必要です。公開先で二通りに分かれます。

@@ -99,6 +99,8 @@ container.replaceChildren(a);
 
 不具合・要望の送り先として、`gc.feedbackLink()`（SDK なし: `https://ga-cen.kbn.one/feedback/@${AUTHOR}/my-puzzle` へのリンク）をタイトル画面などに置く。
 送信はハブでサインインしたプレイヤーが行い、作者（ユーザ）が `/dev` で読む。ゲーム側でフォームを作らない。
+ステージやエラー内容など、作者が知りたいことは `gc.feedbackLink({ kind: "bug", message })` で下書きとして渡す（SDK なし: `#kind=bug&message=<encodeURIComponent した本文>`）。プレイヤーに「貼り付けて」と頼まない。
+`message` は 4000 文字まで。超えると `feedbackLink()` が `RangeError` を投げる。
 
 ## 3. 登録
 

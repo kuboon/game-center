@@ -19,8 +19,9 @@
  * // For a game that draws its own achievement screen.
  * const list = await gc.achievements(); // null without a launch token
  *
- * // Where a player sends a bug report or a request. Always there.
- * document.body.appendChild(gc.feedbackLink());
+ * // Where a player sends a bug report or a request. Always there. A draft
+ * // rides along; the player still reads it and presses send on the hub.
+ * document.body.appendChild(gc.feedbackLink({ kind: "bug", message: "stage 3" }));
  * ```
  *
  * There are two ways to the hub. A player who arrived through the hub carries
@@ -99,6 +100,19 @@ export interface UnlockResult {
    */
   readonly pending: number;
 }
+
+/**
+ * A report the game starts for the player. The hub opens its form with these
+ * filled in, and nothing is sent until the player presses the button there.
+ */
+export interface FeedbackDraft {
+  readonly kind?: "bug" | "request" | "other";
+  /** At most {@link MAX_FEEDBACK_LENGTH} characters, after trimming. */
+  readonly message?: string;
+}
+
+/** The longest message the hub accepts in one report. */
+export const MAX_FEEDBACK_LENGTH = 4000;
 
 const DEFAULT_HUB = "https://ga-cen.kbn.one";
 const TOKEN_KEY = "gc:token";
@@ -291,9 +305,28 @@ export class GameCenter {
    * this game's author, who reads it on the hub. Nothing is sent from the game
    * itself: it has no session to send with, and a report needs to say who
    * wrote it.
+   *
+   * A draft rides in the fragment (`#kind=bug&message=…`), so it never reaches
+   * a server before the player agrees to send it.
+   *
+   * @throws {RangeError} when the message is longer than the hub accepts.
+   *   Unlike `unlock()`, this is a mistake in the game's own code, and a link
+   *   that opens a form the hub will refuse is worse than no link
    */
-  feedbackUrl(): string {
-    return `${this.hub}/feedback/@${this.gameId}`;
+  feedbackUrl(draft: FeedbackDraft = {}): string {
+    const length = draft.message?.trim().length ?? 0;
+    if (length > MAX_FEEDBACK_LENGTH) {
+      throw new RangeError(
+        `feedback message is ${length} characters; the hub accepts at most ${MAX_FEEDBACK_LENGTH}`,
+      );
+    }
+    const params = new URLSearchParams();
+    if (draft.kind) params.set("kind", draft.kind);
+    if (draft.message) params.set("message", draft.message);
+    const fragment = params.toString();
+    return `${this.hub}/feedback/@${this.gameId}${
+      fragment ? `#${fragment}` : ""
+    }`;
   }
 
   /**
@@ -302,11 +335,19 @@ export class GameCenter {
    *
    * It navigates in place, like the claim link. A game that would rather keep
    * its own page open can set `target = "_blank"` on it.
+   *
+   * @throws {RangeError} when the message is too long; see
+   *   {@link GameCenter.feedbackUrl}
    */
-  feedbackLink(options: { text?: string } = {}): HTMLAnchorElement {
+  feedbackLink(
+    options: { text?: string } & FeedbackDraft = {},
+  ): HTMLAnchorElement {
+    const { text, ...draft } = options;
+    // Built first, so a draft that is too long throws before any element does.
+    const href = this.feedbackUrl(draft);
     const a = document.createElement("a");
-    a.href = this.feedbackUrl();
-    a.textContent = options.text ?? "不具合・要望を送る";
+    a.href = href;
+    a.textContent = text ?? "不具合・要望を送る";
     return a;
   }
 

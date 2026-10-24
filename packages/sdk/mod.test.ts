@@ -9,9 +9,9 @@
  * error, never a popup.
  */
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@std/assert";
 
-import { GameCenter } from "./mod.ts";
+import { GameCenter, MAX_FEEDBACK_LENGTH } from "./mod.ts";
 
 const HUB = "https://hub.example";
 const GAME = "kuboon/my-puzzle";
@@ -100,6 +100,43 @@ Deno.test("the feedback link is always there, and names the game", () => {
     const gc = GameCenter.init({ gameId: GAME, hub: HUB });
     // Nothing unlocked, no token: a report is still worth sending.
     assertEquals(gc.feedbackUrl(), `${HUB}/feedback/@${GAME}`);
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("a feedback draft rides in the fragment", () => {
+  const env = browser();
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    const url = new URL(
+      gc.feedbackUrl({ kind: "bug", message: "ステージ3\nスコア 1200" }),
+    );
+    assertEquals(url.pathname, `/feedback/@${GAME}`);
+    // Never in the query: a draft must not reach a server before it is sent.
+    assertEquals(url.search, "");
+    const params = new URLSearchParams(url.hash.slice(1));
+    assertEquals(params.get("kind"), "bug");
+    assertEquals(params.get("message"), "ステージ3\nスコア 1200");
+  } finally {
+    env.restore();
+  }
+});
+
+Deno.test("a feedback message the hub would refuse is the game's error", () => {
+  const env = browser();
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    // Exactly the limit is fine, and so is surrounding whitespace the hub trims.
+    gc.feedbackUrl({ message: ` ${"あ".repeat(MAX_FEEDBACK_LENGTH)}\n` });
+    assertThrows(
+      () => gc.feedbackUrl({ message: "あ".repeat(MAX_FEEDBACK_LENGTH + 1) }),
+      RangeError,
+    );
+    assertThrows(
+      () => gc.feedbackLink({ message: "あ".repeat(MAX_FEEDBACK_LENGTH + 1) }),
+      RangeError,
+    );
   } finally {
     env.restore();
   }
