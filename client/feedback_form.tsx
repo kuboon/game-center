@@ -1,11 +1,10 @@
 /**
- * FeedbackForm — a bug report or request about one game, sent to id.kbn.one,
- * as a `clientEntry`.
+ * FeedbackForm — a bug report or request for a game's author, as a
+ * `clientEntry`.
  *
- * `POST {IdP}/feedback` with the player's own DPoP session, the same way the
- * hub registers push subscriptions. The body is only what the player chose and
- * wrote, plus the game's page on the hub: the IdP records who sent it and from
- * which RP by itself, and refuses to take either from the body.
+ * Posts to `/api/internal/games/@{handle}/{slug}/feedback` with the player's
+ * DPoP session, which is also what puts their name on it. The author reads it
+ * on `/dev`.
  *
  * The text box is uncontrolled and read on input, like the paste box on /dev:
  * binding `value` to state makes the runtime revert the keystroke.
@@ -18,15 +17,15 @@ import {
   type SerializableValue,
 } from "@remix-run/ui";
 
-import { IDP_ORIGIN } from "./idp.ts";
 import { mountSession, sessionStore } from "./session.ts";
 
 export interface FeedbackFormProps {
+  /** Author handle and slug, to address the endpoint. */
+  handle: string;
+  slug: string;
   gameTitle: string;
   /** The game's page on the hub, for the way back. */
   gameHref: string;
-  /** The same page, absolute: what the owner reads the report by. */
-  pageUrl: string;
   [key: string]: SerializableValue;
 }
 
@@ -38,7 +37,7 @@ const KINDS: ReadonlyArray<readonly [Kind, string]> = [
   ["other", "その他"],
 ];
 
-/** What the IdP accepts in one report. */
+/** What the hub accepts in one report. Mirrors `MAX_FEEDBACK_LENGTH`. */
 const MAX_LENGTH = 4000;
 
 type Status =
@@ -65,15 +64,17 @@ export const FeedbackForm = clientEntry(
       status = { kind: "sending" };
       handle.update();
       try {
-        const response = await fetchDpop(`${IDP_ORIGIN}/feedback`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            kind,
-            message: text,
-            pageUrl: handle.props.pageUrl,
-          }),
-        });
+        const { handle: author, slug } = handle.props;
+        const response = await fetchDpop(
+          `/api/internal/games/@${encodeURIComponent(author)}/${
+            encodeURIComponent(slug)
+          }/feedback`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ kind, message: text }),
+          },
+        );
         status = response.ok
           ? { kind: "sent" }
           : { kind: "failed", message: failure(response.status) };
@@ -106,7 +107,7 @@ export const FeedbackForm = clientEntry(
         return (
           <div class="space-y-3">
             <div role="status" class="alert alert-success">
-              送りました。ありがとうございます。
+              作者に届けました。ありがとうございます。
             </div>
             <a
               class="link"
@@ -162,7 +163,7 @@ export const FeedbackForm = clientEntry(
               : null}
             <div class="card-actions items-center justify-between">
               <span class="text-sm opacity-70">
-                送信者はあなたのアカウントとして記録されます
+                作者にはあなたの表示名が伝わります
               </span>
               <button
                 type="button"
@@ -182,13 +183,15 @@ export const FeedbackForm = clientEntry(
   },
 );
 
-/** What to tell the player, by the IdP's answer. */
+/** What to tell the player, by the hub's answer. */
 function failure(status: number): string {
   switch (status) {
     case 400:
       return "内容を送れませんでした。空でないか、長すぎないかを確かめてください。";
     case 401:
       return "サインインが切れています。ページを読み込み直してください。";
+    case 404:
+      return "このゲームは今は受け付けていません。";
     case 429:
       return "送れるのは 1 時間に 5 件までです。少し時間をおいてください。";
     default:

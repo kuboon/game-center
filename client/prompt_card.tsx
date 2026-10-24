@@ -79,7 +79,8 @@ https://ga-cen.kbn.one/claim/@${handle}/<id>#gc=first_clear,high_score:1200
 押せるリンクとして出すこと (ポップアップブロック対策と、プレイヤーの意思確認)。
 
 不具合・要望の送り先として、タイトル画面などに次のリンクを置いてください
-(SDK なら gc.feedbackLink())。送信は GameCenter 側で行うので、フォームは不要です。
+(SDK なら gc.feedbackLink())。送信は GameCenter 側で行い、作者が /dev で読むので、
+フォームは不要です。
 
 https://ga-cen.kbn.one/feedback/@${handle}/<id>
 

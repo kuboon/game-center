@@ -435,21 +435,24 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
 
 ## フィードバック
 
-プレイヤーの不具合報告・要望は id.kbn.one の `POST /feedback` に送る。ハブは
-**保存も中継もしない**。IdP が DPoP セッションから送信者を、`Origin` から RP を
-記録し、オーナーのホームポータルの「フィードバック: ga-cen.kbn.one」スレッドに
-投稿する(id.kbn.one の README「フィードバック」)
+プレイヤーの不具合報告・要望は**ゲームの作者に届ける**。ハブが `game_feedback`
+に保存し、作者の `/dev`(`client/feedback_inbox.tsx`)に出し、push で知らせる。
 
-- 送るのはハブのページ
-  `/feedback/@{author}/{slug}`(`client/feedback_form.tsx`)。
-  ゲームからは送れない — RP ではなく、セッションも持たない。SDK は
-  `feedbackLink()` でそこへのリンクを作るだけ(claim リンクと同じ形)
-- どのゲームの話かは `pageUrl` に**ハブのゲームページの絶対
-  URL**を入れて伝える。 本文に書き足さない。IdP
-  は本文を利用者の文として引用するので、ハブが足した
-  行まで利用者が書いたように見える
-- 届くのは運営(IdP のオーナー)で、ゲームの作者ではない。作者ごとの受け口は無い
-- 1 人 1 時間に 5 件(IdP 側)。超過は 429 で、フォームがそう伝える
+- 送るのはハブのページ `/feedback/@{author}/{slug}`(`client/feedback_form.tsx` →
+  `POST /api/internal/games/@{handle}/{slug}/feedback`)。ゲームからは送れない —
+  セッションを持たない。SDK は `feedbackLink()` でそこへのリンクを作るだけ
+  (claim リンクと同じ形)
+- **送るにはサインインが要る**。報告には必ず送り手の名前が付き、作者には表示名が
+  伝わる。誰の申告かは確か、という他の記録と同じ約束
+- **返信の仕組みは無い**。作者ができるのは読むことと消すことだけ。会話の形を
+  作ると、未読・既読・通報まで要るものになる
+- id.kbn.one の `POST /feedback`(IdP のオーナーに届く)は**使わない**。
+  不具合を直せるのはそのゲームを作った人で、それを知っているのはハブだけ
+- 公開停止のゲームは受け付けない(解除と同じ)。報告はゲームと一緒に消える
+  (`on delete cascade`)。消えるのは誰も遊ばなかったゲームだけで、たいていは
+  登録の間違い。libSQL は外部キーを強制するので、cascade が無いと `retireGame`
+  の削除が通らない
+- 1 人 1 時間に 5 件(`takeToken` の `feedback:{userId}`)。超過は 429
 
 ## 実績解除
 

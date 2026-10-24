@@ -359,6 +359,25 @@ Deno.test("your progress in a game needs a session", async () => {
   assertEquals(response.headers.get("cache-control"), "no-store");
 });
 
+Deno.test("feedback needs a session, to send and to read", async () => {
+  // A report carries its sender's name, and an inbox is its author's alone.
+  const requests: Array<[string, RequestInit]> = [
+    ["/api/internal/games/@kuboon/puzzle/feedback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "bug", message: "x" }),
+    }],
+    ["/api/internal/feedback", {}],
+    ["/api/internal/feedback/1", { method: "DELETE" }],
+  ];
+  for (const [path, init] of requests) {
+    const response = await router.fetch(
+      new Request(`http://localhost${path}`, init),
+    );
+    assertEquals(response.status, 401, `${init.method ?? "GET"} ${path}`);
+  }
+});
+
 Deno.test("the catalog tells a crawler what game-center is", async () => {
   const response = await router.fetch(new Request("http://localhost/"));
   const html = await response.text();

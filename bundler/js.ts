@@ -32,6 +32,7 @@ const CLIENT_ENTRIES = [
   "achievement_board.tsx",
   "my_record.tsx",
   "feedback_form.tsx",
+  "feedback_inbox.tsx",
   "prompt_card.tsx",
   "follow_button.tsx",
   "share_row.tsx",

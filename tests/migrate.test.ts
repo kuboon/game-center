@@ -47,6 +47,7 @@ Deno.test("migrate creates every table the design declares", async () => {
         "user_achievements",
         "game_registrations",
         "follows",
+        "game_feedback",
         "kv",
       ]
     ) {
@@ -124,6 +125,7 @@ Deno.test("rollback takes the schema back to nothing, and forward again", async 
         "user_achievements",
         "game_registrations",
         "follows",
+        "game_feedback",
         "kv",
       ]
     ) {

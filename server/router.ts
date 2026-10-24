@@ -35,6 +35,11 @@ import {
   internalUnfollowAction,
 } from "./controllers/api/internal_follows.ts";
 import { internalGameProgressAction } from "./controllers/api/internal_game_progress.ts";
+import {
+  internalFeedbackDeleteAction,
+  internalFeedbackListAction,
+  internalGameFeedbackAction,
+} from "./controllers/api/internal_feedback.ts";
 import { internalMeAchievementsAction } from "./controllers/api/internal_me.ts";
 import {
   internalClaimAction,
@@ -124,6 +129,9 @@ router.get(routes.internalFollowers, internalFollowersAction);
 router.post(routes.internalFollowersSeen, internalFollowersSeenAction);
 router.get(routes.internalTimeline, internalTimelineAction);
 router.get(routes.internalGameProgress, internalGameProgressAction);
+router.post(routes.internalGameFeedback, internalGameFeedbackAction);
+router.get(routes.internalFeedback, internalFeedbackListAction);
+router.delete(routes.internalFeedbackDelete, internalFeedbackDeleteAction);
 router.delete(routes.internalGameRetire, internalGameRetireAction);
 router.post(routes.internalGameRestore, internalGameRestoreAction);
 

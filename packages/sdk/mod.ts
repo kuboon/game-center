@@ -288,9 +288,9 @@ export class GameCenter {
    * Where the player can send a bug report or a request about this game.
    *
    * A page on the hub. The player signs in there, and the report goes to
-   * GameCenter's operator with this game's page attached. Nothing is sent from
-   * the game itself: it has no session to send with, and a report needs to say
-   * who wrote it.
+   * this game's author, who reads it on the hub. Nothing is sent from the game
+   * itself: it has no session to send with, and a report needs to say who
+   * wrote it.
    */
   feedbackUrl(): string {
     return `${this.hub}/feedback/@${this.gameId}`;

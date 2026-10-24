@@ -1,17 +1,15 @@
 /**
- * GET /feedback/@{author}/{slug} — a bug report or request about one game.
+ * GET /feedback/@{author}/{slug} — a bug report or request for a game's
+ * author.
  *
- * Sending is id.kbn.one's, not the hub's: `POST {IdP}/feedback` stores the
- * report and posts it to the owner's home portal, in the thread for this
- * hub's host. The IdP takes who sent it from the DPoP session and where from
- * the browser's `Origin`, so the hub has nothing to vouch for and nothing to
- * store. What the hub adds is which game: the report's page is the game's
- * page here, and that is the line the owner reads it by.
+ * The report is the author's to read: the person who can act on "stage 3 lets
+ * the ball through" is whoever made stage 3. The hub keeps it and shows it on
+ * the author's `/dev`, and tells them it arrived.
  *
  * A page of its own rather than something inside the game, for the reason the
- * claim page is one. A game cannot reach the IdP — it is not a registered RP
- * and holds no session — and a sandboxed game cannot even open a window. A
- * plain link works from anywhere, and here the player is signed in.
+ * claim page is one. Sending needs to say who is sending, and a game holds no
+ * session; a sandboxed one cannot even open a window. A plain link works from
+ * anywhere, and here the player is signed in.
  *
  * The form is the {@link FeedbackForm} clientEntry: sending needs a DPoP proof,
  * and an SSR request carries none.
@@ -24,8 +22,8 @@ import { gameRef } from "@game-center/protocol";
 import { FeedbackForm } from "../../client/feedback_form.tsx";
 import { getDb } from "../db/client.ts";
 import { findGame } from "../db/games.ts";
+import { findUserById } from "../db/users.ts";
 import { routes } from "../routes.ts";
-import { absoluteUrl } from "../ui/page_meta.ts";
 import { renderPage } from "../utils/render.tsx";
 
 export const feedbackPageAction = {
@@ -35,7 +33,8 @@ export const feedbackPageAction = {
     const client = getDb();
     const game = client ? await findGame(client, gameId) : null;
 
-    if (!game) {
+    // A withdrawn game takes no reports; its author stepped away from it.
+    if (!client || !game || game.status !== "active") {
       return renderPage(
         context,
         <main class="mx-auto w-full max-w-3xl space-y-6 p-8">
@@ -53,6 +52,7 @@ export const feedbackPageAction = {
     }
 
     const gameHref = routes.game.href({ handle, slug });
+    const author = await findUserById(client, game.ownerId);
     return renderPage(
       context,
       <main class="mx-auto w-full max-w-3xl space-y-6 p-8">
@@ -65,13 +65,16 @@ export const feedbackPageAction = {
           <h1 class="text-3xl font-bold">フィードバックを送る</h1>
         </div>
         <p>
-          不具合や「こうしてほしい」を GameCenter の運営に送れます。
-          返信はできないので、気づいたことをそのまま書いてください。
+          {author
+            ? `不具合や「こうしてほしい」を、作者の ${author.displayName} さんに送れます。`
+            : "不具合や「こうしてほしい」を、作者に送れます。"}
+          {"返信の仕組みは無いので、気づいたことをそのまま書いてください。"}
         </p>
         <FeedbackForm
+          handle={handle}
+          slug={slug}
           gameTitle={game.title}
           gameHref={gameHref}
-          pageUrl={absoluteUrl(gameHref) ?? gameHref}
         />
       </main>,
       { title: `${game.title} へのフィードバック` },
