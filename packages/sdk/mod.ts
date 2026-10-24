@@ -18,6 +18,9 @@
  *
  * // For a game that draws its own achievement screen.
  * const list = await gc.achievements(); // null without a launch token
+ *
+ * // Where a player sends a bug report or a request. Always there.
+ * document.body.appendChild(gc.feedbackLink());
  * ```
  *
  * There are two ways to the hub. A player who arrived through the hub carries
@@ -278,6 +281,32 @@ export class GameCenter {
     a.href = href;
     a.textContent = options.text ??
       `実績を記録する(${this.#pending.length}件)`;
+    return a;
+  }
+
+  /**
+   * Where the player can send a bug report or a request about this game.
+   *
+   * A page on the hub. The player signs in there, and the report goes to
+   * GameCenter's operator with this game's page attached. Nothing is sent from
+   * the game itself: it has no session to send with, and a report needs to say
+   * who wrote it.
+   */
+  feedbackUrl(): string {
+    return `${this.hub}/feedback/@${this.gameId}`;
+  }
+
+  /**
+   * An anchor to {@link GameCenter.feedbackUrl}. Unlike the claim link there
+   * is always one.
+   *
+   * It navigates in place, like the claim link. A game that would rather keep
+   * its own page open can set `target = "_blank"` on it.
+   */
+  feedbackLink(options: { text?: string } = {}): HTMLAnchorElement {
+    const a = document.createElement("a");
+    a.href = this.feedbackUrl();
+    a.textContent = options.text ?? "不具合・要望を送る";
     return a;
   }
 

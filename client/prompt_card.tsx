@@ -78,6 +78,11 @@ https://ga-cen.kbn.one/claim/@${handle}/<id>#gc=first_clear,high_score:1200
 どちらの場合も、**勝手に window.open しないでください。**
 押せるリンクとして出すこと (ポップアップブロック対策と、プレイヤーの意思確認)。
 
+不具合・要望の送り先として、タイトル画面などに次のリンクを置いてください
+(SDK なら gc.feedbackLink())。送信は GameCenter 側で行うので、フォームは不要です。
+
+https://ga-cen.kbn.one/feedback/@${handle}/<id>
+
 ## 3. 登録
 
 公開したあとに一度だけ必要です。公開先で二通りに分かれます。

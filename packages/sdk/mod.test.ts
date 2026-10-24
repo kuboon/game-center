@@ -94,6 +94,17 @@ Deno.test("one claim link carries everything waiting", async () => {
   }
 });
 
+Deno.test("the feedback link is always there, and names the game", () => {
+  const env = browser();
+  try {
+    const gc = GameCenter.init({ gameId: GAME, hub: HUB });
+    // Nothing unlocked, no token: a report is still worth sending.
+    assertEquals(gc.feedbackUrl(), `${HUB}/feedback/@${GAME}`);
+  } finally {
+    env.restore();
+  }
+});
+
 Deno.test("offers no link when there is nothing to record", () => {
   const env = browser();
   try {

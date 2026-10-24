@@ -17,6 +17,7 @@ export const routes = route({
   game: get("/@:handle/:slug"),
   claimAll: get("/claim/@:handle/:slug"),
   claim: get("/claim/@:handle/:slug/:key"),
+  feedback: get("/feedback/@:handle/:slug"),
   me: get("/me"),
   dev: get("/dev"),
   schema: get("/schema/gamecenter.json"),

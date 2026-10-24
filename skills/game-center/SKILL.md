@@ -97,6 +97,9 @@ container.replaceChildren(a);
 
 解除は冪等なので、ロードのたびに同じ実績を報告してよい。
 
+不具合・要望の送り先として、`gc.feedbackLink()`（SDK なし: `https://ga-cen.kbn.one/feedback/@${AUTHOR}/my-puzzle` へのリンク）をタイトル画面などに置く。
+送信はハブでサインインしたプレイヤーが行うので、ゲーム側でフォームを作らない。
+
 ## 3. 登録
 
 ゲームを公開したら、その URL をユーザに登録してもらう。

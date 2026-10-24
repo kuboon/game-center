@@ -31,6 +31,7 @@ const CLIENT_ENTRIES = [
   "claim_all_panel.tsx",
   "achievement_board.tsx",
   "my_record.tsx",
+  "feedback_form.tsx",
   "prompt_card.tsx",
   "follow_button.tsx",
   "share_row.tsx",
