@@ -14,12 +14,22 @@
  *
  * The text box is uncontrolled and read on input, like the paste box on /dev:
  * binding `value` to state makes the runtime revert the keystroke.
+ *
+ * The draft goes in through `ref`, as the element's live value, and **not**
+ * through `defaultValue`. On a `<textarea>`, `defaultValue` is the element's
+ * text content, and `@remix-run/ui@0.8` reconciles that content against the
+ * vtree's children — which for a textarea are always none. So the first
+ * re-render after the form appears deletes the draft, and something always
+ * re-renders: the session settling is enough. The draft showed for a moment
+ * and vanished. A value set on the element is the "dirty" value, which no
+ * change to the default touches.
  */
 
 import {
   clientEntry,
   type Handle,
   on,
+  ref,
   type SerializableValue,
 } from "@remix-run/ui";
 
@@ -177,11 +187,18 @@ export const FeedbackForm = clientEntry(
               <textarea
                 class="textarea textarea-bordered h-40 w-full"
                 maxlength={MAX_LENGTH}
-                defaultValue={message}
                 placeholder="どの画面で、何をしたら、どうなったか"
-                mix={[on("input", (event) => {
-                  message = (event.currentTarget as HTMLTextAreaElement).value;
-                })]}
+                mix={[
+                  // `message`, not the draft: if the element is ever built
+                  // again, what the player has typed so far comes with it.
+                  ref((node) => {
+                    (node as HTMLTextAreaElement).value = message;
+                  }),
+                  on("input", (event) => {
+                    message = (event.currentTarget as HTMLTextAreaElement)
+                      .value;
+                  }),
+                ]}
               >
               </textarea>
             </label>

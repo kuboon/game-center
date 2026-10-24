@@ -538,4 +538,10 @@ Turso (libSQL)。 `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN`
   `TARGET_HEADER`)。これはハブが自分で決めた HTTP ヘッダ名であって
   `@remix-run/ui` の DOM 属性ではない。改名するとサーバが自分のリクエストを
   認識できなくなるだけ
+- **`<textarea>` に `defaultValue` を渡さない**。textarea の `defaultValue` は
+  中身のテキストで、`@remix-run/ui@0.8` は中身を vtree の children(textarea は
+  常に空)と突き合わせるので、次の再描画で消える。初期値は `ref()` で要素の
+  `value` に入れる(`client/feedback_form.tsx`)。最初の描画では出ているので
+  一枚描いて確かめても気づけない。`tests/textarea_default.test.ts`
+  が見張っている
 - `docs/` は `deno fmt` の対象外。日本語の文書は一文一行で書く
