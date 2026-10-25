@@ -34,6 +34,8 @@ export interface Feedback {
     readonly handle: string | null;
     readonly displayName: string;
   };
+  /** Arrived since the author last looked at the inbox. */
+  readonly unseen: boolean;
 }
 
 /**
@@ -77,10 +79,13 @@ export async function listFeedbackForOwner(
                  games.title as game_title,
                  game_feedback.kind, game_feedback.message,
                  game_feedback.created_at,
-                 users.handle, users.display_name
+                 users.handle, users.display_name,
+                 (me.feedback_seen_at is null
+                  or game_feedback.created_at > me.feedback_seen_at) as unseen
             from game_feedback
             join games on games.id = game_feedback.game_id
             join users on users.id = game_feedback.sender_id
+            join users me on me.id = games.owner_id
            where games.owner_id = ?
            order by game_feedback.created_at desc, game_feedback.id desc
            limit ?`,
@@ -97,7 +102,50 @@ export async function listFeedbackForOwner(
       handle: row.handle === null ? null : String(row.handle),
       displayName: String(row.display_name),
     },
+    unseen: Number(row.unseen) === 1,
   }));
+}
+
+/**
+ * How many reports arrived since the author last looked — the navbar's half
+ * of {@link listFeedbackForOwner}, without the rows.
+ */
+export async function countUnseenFeedback(
+  client: Client,
+  ownerId: number,
+): Promise<number> {
+  const result = await client.execute({
+    sql: `select count(*) as n
+            from game_feedback
+            join games on games.id = game_feedback.game_id
+            join users me on me.id = games.owner_id
+           where games.owner_id = ?
+             and (me.feedback_seen_at is null
+                  or game_feedback.created_at > me.feedback_seen_at)`,
+    args: [ownerId],
+  });
+  return Number(result.rows[0].n);
+}
+
+/**
+ * Record that the author has seen the inbox up to `through`.
+ *
+ * `through` is the newest report the page actually showed, not "now": one that
+ * lands between the read and this write stays new. Never moves backwards, so
+ * an older tab reporting late cannot bring back what a newer one cleared.
+ */
+export async function markFeedbackSeen(
+  client: Client,
+  ownerId: number,
+  through: string,
+): Promise<void> {
+  await client.execute({
+    sql: `update users
+             set feedback_seen_at = ?
+           where id = ?
+             and (feedback_seen_at is null or feedback_seen_at < ?)`,
+    args: [through, ownerId, through],
+  });
 }
 
 /**

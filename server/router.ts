@@ -38,8 +38,10 @@ import { internalGameProgressAction } from "./controllers/api/internal_game_prog
 import {
   internalFeedbackDeleteAction,
   internalFeedbackListAction,
+  internalFeedbackSeenAction,
   internalGameFeedbackAction,
 } from "./controllers/api/internal_feedback.ts";
+import { internalDevAttentionAction } from "./controllers/api/internal_dev_attention.ts";
 import { internalMeAchievementsAction } from "./controllers/api/internal_me.ts";
 import {
   internalClaimAction,
@@ -132,6 +134,8 @@ router.get(routes.internalGameProgress, internalGameProgressAction);
 router.post(routes.internalGameFeedback, internalGameFeedbackAction);
 router.get(routes.internalFeedback, internalFeedbackListAction);
 router.delete(routes.internalFeedbackDelete, internalFeedbackDeleteAction);
+router.post(routes.internalFeedbackSeen, internalFeedbackSeenAction);
+router.get(routes.internalDevAttention, internalDevAttentionAction);
 router.delete(routes.internalGameRetire, internalGameRetireAction);
 router.post(routes.internalGameRestore, internalGameRestoreAction);
 

@@ -121,7 +121,18 @@ export const DevConsole = clientEntry(
     /** Which game's removal is waiting for a second press. */
     let confirming: string | null = null;
 
-    const session = mountSession(handle, refresh);
+    /** Whose session the panel was loaded for. */
+    let loadedFor: string | null = null;
+
+    // Any change to the shared store reaches here — including the badge this
+    // panel itself updates — so reload only when it is a different person.
+    // The panel's own actions call `refresh` directly.
+    const session = mountSession(handle, () => {
+      const userId = sessionStore.userId;
+      if (userId && userId === loadedFor) return;
+      loadedFor = userId;
+      return refresh();
+    });
 
     function api(path: string, init?: RequestInit): Promise<Response> {
       const fetchDpop = sessionStore.fetchDpop;
@@ -169,6 +180,34 @@ export const DevConsole = clientEntry(
         loaded = true;
         handle.update();
       }
+      if (!loadError) void settleAttention();
+    }
+
+    /**
+     * Now that the panel is drawn, bring the navbar's badge in line with it.
+     *
+     * The reports on screen count as seen — reported as the newest one shown
+     * rather than "now", so one landing during the round trip stays new. The
+     * queue is not marked: a submission is dealt with by approving or refusing
+     * it, so it keeps counting until then. Their "新着" marks stay on this
+     * page; they say what was new when you arrived.
+     */
+    async function settleAttention(): Promise<void> {
+      let unseen = reports.filter((report) => report.unseen).length;
+      const newest = reports[0]?.createdAt;
+      if (unseen > 0 && newest) {
+        try {
+          const response = await api("/api/internal/feedback/seen", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ through: newest }),
+          });
+          if (response.ok) unseen = 0;
+        } catch {
+          // The badge stays lit, which is the safe way to be wrong.
+        }
+      }
+      sessionStore.setDevAttention(pending.length + unseen);
     }
 
     /**

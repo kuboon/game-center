@@ -23,6 +23,8 @@ export interface Report {
   message: string;
   createdAt: string;
   sender: { handle: string | null; displayName: string };
+  /** Arrived since the author last opened the inbox. */
+  unseen: boolean;
 }
 
 const KIND_LABELS: Record<Report["kind"], string> = {
@@ -58,6 +60,9 @@ export function feedbackInbox(
               class="border-base-300 space-y-1 border-t pt-3"
             >
               <div class="flex flex-wrap items-baseline gap-x-2 text-sm">
+                {report.unseen
+                  ? <span class="badge badge-warning badge-sm">新着</span>
+                  : null}
                 <span class="badge badge-outline badge-sm">
                   {KIND_LABELS[report.kind]}
                 </span>

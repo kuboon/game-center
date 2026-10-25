@@ -5,6 +5,7 @@
  *   leaves a report on a game, and its author is told
  * - `GET /api/internal/feedback` — the author's inbox, across their games
  * - `DELETE /api/internal/feedback/{id}` — the author throws one away
+ * - `POST /api/internal/feedback/seen` — the inbox has been shown up to here
  *
  * Everything is DPoP-authenticated. A report without a name would be the one
  * thing on the hub that nobody stands behind, and an inbox anyone could fill
@@ -21,6 +22,7 @@ import {
   FEEDBACK_KINDS,
   type FeedbackKind,
   listFeedbackForOwner,
+  markFeedbackSeen,
   MAX_FEEDBACK_LENGTH,
   submitFeedback,
 } from "../../db/feedback.ts";
@@ -120,6 +122,30 @@ export const internalFeedbackDeleteAction = {
     return apiJson({ deleted: true });
   },
 } satisfies Action<typeof routes.internalFeedbackDelete>;
+
+/**
+ * Reading the inbox does not mark it seen; this does, sent by `/dev` once it
+ * has drawn the list. The same split as the followers list, for the same
+ * reason: the navbar reads the count on every page.
+ */
+export const internalFeedbackSeenAction = {
+  async handler(context) {
+    const auth = await authenticateSession(context);
+    if (!auth.ok) return auth.response;
+
+    let through: unknown;
+    try {
+      ({ through } = await context.request.json() as { through?: unknown });
+    } catch {
+      return apiError("Body must be JSON", 400);
+    }
+    if (typeof through !== "string" || !through) {
+      return apiError("through is required", 400);
+    }
+    await markFeedbackSeen(requireDb(), auth.user.id, through);
+    return apiJson({ ok: true });
+  },
+} satisfies Action<typeof routes.internalFeedbackSeen>;
 
 /** The notification's title, by what the player said it was. */
 const KIND_TITLES: Record<FeedbackKind, string> = {

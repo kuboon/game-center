@@ -369,6 +369,12 @@ Deno.test("feedback needs a session, to send and to read", async () => {
     }],
     ["/api/internal/feedback", {}],
     ["/api/internal/feedback/1", { method: "DELETE" }],
+    ["/api/internal/feedback/seen", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ through: "2026-10-25 00:00:00" }),
+    }],
+    ["/api/internal/dev/attention", {}],
   ];
   for (const [path, init] of requests) {
     const response = await router.fetch(

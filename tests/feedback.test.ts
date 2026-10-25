@@ -10,8 +10,10 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 
 import type { GameManifest } from "@game-center/protocol";
 import {
+  countUnseenFeedback,
   deleteFeedback,
   listFeedbackForOwner,
+  markFeedbackSeen,
   submitFeedback,
 } from "../server/db/feedback.ts";
 import { findGame, registerGame, retireGame } from "../server/db/games.ts";
@@ -132,5 +134,48 @@ Deno.test("the table refuses what the form would refuse", async () => {
         })
       );
     }
+  });
+});
+
+Deno.test("reports are new until the author has been shown them", async () => {
+  await migratedDb(async (client) => {
+    const { kuboon, midori, player } = await setup(client);
+    const report = async (gameId: string, at: string) => {
+      const id = await submitFeedback(client, {
+        gameId,
+        senderId: player.id,
+        kind: "bug",
+        message: at,
+      });
+      // Pinned, because `datetime('now')` gives two quick reports one time.
+      await client.execute({
+        sql: "update game_feedback set created_at = ? where id = ?",
+        args: [at, id],
+      });
+    };
+    await report("kuboon/blocks", "2026-10-24 01:00:00");
+    await report("kuboon/blocks", "2026-10-24 02:00:00");
+    await report("midori/stars", "2026-10-24 03:00:00");
+
+    // Never looked: everything is new, and only your own games count.
+    assertEquals(await countUnseenFeedback(client, kuboon.id), 2);
+    assertEquals(await countUnseenFeedback(client, midori.id), 1);
+
+    // Shown through the first; the later one stays new.
+    await markFeedbackSeen(client, kuboon.id, "2026-10-24 01:00:00");
+    assertEquals(await countUnseenFeedback(client, kuboon.id), 1);
+    assertEquals(
+      (await listFeedbackForOwner(client, kuboon.id)).map((r) => r.unseen),
+      [true, false],
+    );
+
+    // A late report from an older tab does not bring anything back.
+    await markFeedbackSeen(client, kuboon.id, "2026-10-24 02:00:00");
+    await markFeedbackSeen(client, kuboon.id, "2026-10-24 01:00:00");
+    assertEquals(await countUnseenFeedback(client, kuboon.id), 0);
+
+    // Seeing is not dealing with: the reports are all still there.
+    assertEquals((await listFeedbackForOwner(client, kuboon.id)).length, 2);
+    assertEquals(await countUnseenFeedback(client, midori.id), 1);
   });
 });
