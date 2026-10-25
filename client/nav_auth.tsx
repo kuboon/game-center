@@ -11,11 +11,20 @@
  * reads as a stray control from another page. "INSERT COIN" is the sign-in
  * affordance an arcade already taught everybody.
  *
- * It also carries the one notification the hub has: a dot when somebody has
- * followed you since you last looked. Being followed is the only thing that
- * happens to a player without them doing anything, so it is the only thing
- * they will never go and check. The dot is here because this is the one
- * element on every page.
+ * It also carries the hub's notifications, because this is the one element on
+ * every page:
+ *
+ * - On your name, a count of people who followed you since you last looked.
+ *   Being followed is the only thing that happens to a player without them
+ *   doing anything, so it is the only thing they will never go and check.
+ * - On "開発者", what `/dev` has waiting: submissions naming you as author,
+ *   and feedback from players since you last opened the inbox. An author has
+ *   no other reason to open `/dev` on any given day, and a CI run stays stuck
+ *   on a 202 until they do.
+ *
+ * The link itself is always there, signed in or not, and in the first render
+ * too: someone who wants to make a game has not signed in yet, and a link that
+ * appears late shoves the name across the bar.
  */
 
 import {
@@ -42,10 +51,10 @@ export const NavAuth = clientEntry(
     let askedFor: string | null = null;
 
     /**
-     * Ask how many followers are new.
+     * Ask what is new: followers, and what `/dev` has waiting.
      *
-     * Reading that endpoint deliberately marks nothing seen — the dot has to
-     * survive until the player has actually looked at the names.
+     * Reading either endpoint deliberately marks nothing seen — a badge has to
+     * survive until the player has actually looked at what it counts.
      */
     const askUnseen = async () => {
       const { userId, fetchDpop } = sessionStore;
@@ -56,15 +65,58 @@ export const NavAuth = clientEntry(
       if (askedFor === userId) return;
       askedFor = userId;
 
-      const response = await fetchDpop("/api/internal/followers");
-      if (!response.ok) return;
-      const { unseen } = await response.json() as { unseen: number };
-      sessionStore.setUnseenFollowers(unseen);
+      const [followers, dev] = await Promise.all([
+        fetchDpop("/api/internal/followers"),
+        fetchDpop("/api/internal/dev/attention"),
+      ]);
+      if (followers.ok) {
+        const { unseen } = await followers.json() as { unseen: number };
+        sessionStore.setUnseenFollowers(unseen);
+      }
+      if (dev.ok) {
+        const { pending, feedback } = await dev.json() as {
+          pending: number;
+          feedback: number;
+        };
+        sessionStore.setDevAttention(pending + feedback);
+      }
     };
 
     const session = mountSession(handle, askUnseen);
 
-    return () => {
+    return () => (
+      <div class="flex items-center gap-1">
+        {devLink()}
+        {account()}
+      </div>
+    );
+
+    function devLink() {
+      const waiting = session.ready && sessionStore.userId
+        ? sessionStore.devAttention ?? 0
+        : 0;
+      return (
+        <a
+          class="btn btn-ghost btn-sm text-arcade-ink px-2"
+          href="/dev"
+          data-rmx-target="content"
+        >
+          開発者
+          {waiting > 0
+            ? (
+              <span
+                class="badge badge-warning badge-sm"
+                title={`開発者ページに ${waiting} 件`}
+              >
+                {waiting}
+              </span>
+            )
+            : null}
+        </a>
+      );
+    }
+
+    function account() {
       if (!session.ready) {
         return (
           <span class="loading loading-spinner loading-sm text-arcade-dim">
@@ -85,7 +137,7 @@ export const NavAuth = clientEntry(
       const unseen = sessionStore.unseenFollowers ?? 0;
       return (
         <a
-          class="btn btn-ghost btn-sm text-arcade-ink max-w-40"
+          class="btn btn-ghost btn-sm text-arcade-ink max-w-28 px-2 sm:max-w-40"
           href="/me"
           data-rmx-target="content"
         >
@@ -104,6 +156,6 @@ export const NavAuth = clientEntry(
             : null}
         </a>
       );
-    };
+    }
   },
 );

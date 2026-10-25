@@ -204,7 +204,7 @@ async function findPendingByUrl(
   return row ? toPending(row) : null;
 }
 
-async function countPending(
+export async function countPending(
   client: Client,
   authorId: number,
 ): Promise<number> {

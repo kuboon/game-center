@@ -124,7 +124,7 @@ export function Document(handle: Handle<DocumentProps>) {
         </head>
         <body class="min-h-screen bg-base-100 text-base-content">
           <header class="navbar bg-arcade-shell border-b border-white/10">
-            <div class="navbar-start">
+            <div class="navbar-start min-w-0 flex-1">
               <a
                 class="font-dot btn btn-ghost text-arcade-amber text-lg tracking-[0.08em] sm:text-xl"
                 href={routes.home.href()}
@@ -133,7 +133,7 @@ export function Document(handle: Handle<DocumentProps>) {
                 GAME CENTER
               </a>
             </div>
-            <div class="navbar-end">
+            <div class="navbar-end w-auto shrink-0">
               <NavAuth returnTo={routes.me.href()} />
             </div>
           </header>

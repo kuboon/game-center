@@ -47,6 +47,8 @@ export const routes = route({
   internalGameFeedback: post("/api/internal/games/@:handle/:slug/feedback"),
   internalFeedback: get("/api/internal/feedback"),
   internalFeedbackDelete: del("/api/internal/feedback/:id"),
+  internalFeedbackSeen: post("/api/internal/feedback/seen"),
+  internalDevAttention: get("/api/internal/dev/attention"),
   internalGameRetire: del("/api/internal/games/@:handle/:slug"),
   internalGameRestore: post("/api/internal/games/@:handle/:slug/restore"),
 

@@ -1,0 +1,13 @@
+-- When each author last looked at the feedback on their games.
+--
+-- The same shape as `followers_seen_at`, for the same reason: what is new is
+-- `game_feedback.created_at > users.feedback_seen_at`, which the rows already
+-- answer. A per-report "read" flag would be a second copy of that fact.
+--
+-- Reports are not cleared by reading them — the author deletes a report once
+-- it is dealt with — so without this the navbar could only count what is
+-- still in the inbox, and a report kept as a reminder would light the badge
+-- on every page forever.
+--
+-- Null means "never looked": every report already there is new the first time.
+alter table users add column feedback_seen_at text;

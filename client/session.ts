@@ -88,6 +88,12 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
    * showing the names. The store is the one thing both already share.
    */
   unseenFollowers: number | null = null;
+  /**
+   * What `/dev` has waiting — submissions to approve plus feedback not yet
+   * looked at — or null until asked. Shared for the same reason as
+   * {@link unseenFollowers}: the navbar draws it, `/dev` clears it.
+   */
+  devAttention: number | null = null;
 
   #loading?: Promise<void>;
 
@@ -166,6 +172,13 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
     this.#emitChange();
   }
 
+  /** Publish a new `/dev` attention count, like {@link setUnseenFollowers}. */
+  setDevAttention(count: number): void {
+    if (this.devAttention === count) return;
+    this.devAttention = count;
+    this.#emitChange();
+  }
+
   /** Send the browser to the IdP to authenticate, then back to `returnTo`. */
   signIn(returnTo: string): void {
     const params = new URLSearchParams({
@@ -184,6 +197,7 @@ class DpopSessionStore extends TypedEventTarget<SessionEventMap> {
     this.handle = null;
     // Somebody else's badge is not this browser's to keep showing.
     this.unseenFollowers = null;
+    this.devAttention = null;
     this.#emitChange();
   }
 
